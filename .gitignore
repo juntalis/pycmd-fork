@@ -10,3 +10,6 @@
 .ropeproject
 .idea
 semantic.cache
+
+# Virtual env stuff
+.vip

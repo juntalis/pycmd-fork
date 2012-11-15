@@ -2,18 +2,20 @@
 # Unit tests for console.py
 #
 
-from unittest import TestCase, TestSuite, defaultTestLoader
+from unittest import TestCase, TestSuite, defaultTestLoader, skipUnless
 import console
 from sys import stdout
 from console import get_text_attributes, set_text_attributes
 from pycmd_public import color
+from . import is_win
 
+@skipUnless(is_win, 'Windows-specific test case')
 class TestColors(TestCase):
     """Test the manipulation of color attributes"""
 
     def setUp(self):
         self.orig_attr = get_text_attributes()
-        
+
     def tearDown(self):
         set_text_attributes(self.orig_attr)
 
@@ -24,8 +26,8 @@ class TestColors(TestCase):
                      color.Fore.SET_BLUE +
                      color.Fore.SET_BRIGHT)
         attr = get_text_attributes()
-        self.assertTrue(attr & console.FOREGROUND_RED 
-                        and attr & console.FOREGROUND_GREEN 
+        self.assertTrue(attr & console.FOREGROUND_RED
+                        and attr & console.FOREGROUND_GREEN
                         and attr & console.FOREGROUND_BLUE
                         and attr & console.FOREGROUND_BRIGHT)
 
@@ -36,16 +38,16 @@ class TestColors(TestCase):
                      color.Fore.CLEAR_BLUE +
                      color.Fore.CLEAR_BRIGHT)
         attr = get_text_attributes()
-        self.assertFalse(attr & console.FOREGROUND_RED 
-                         or attr & console.FOREGROUND_GREEN 
+        self.assertFalse(attr & console.FOREGROUND_RED
+                         or attr & console.FOREGROUND_GREEN
                          or attr & console.FOREGROUND_BLUE
                          or attr & console.FOREGROUND_BRIGHT)
 
     def testRgbToggle(self):
         """Test the toggling of individual RGB components"""
         attr = get_text_attributes()
-        set_text_attributes(attr 
-                            | console.FOREGROUND_RED 
+        set_text_attributes(attr
+                            | console.FOREGROUND_RED
                             | console.FOREGROUND_GREEN
                             | console.FOREGROUND_BLUE
                             | console.FOREGROUND_BRIGHT)
@@ -54,8 +56,8 @@ class TestColors(TestCase):
                      color.Fore.TOGGLE_BLUE +
                      color.Fore.TOGGLE_BRIGHT)
         attr = get_text_attributes()
-        self.assertFalse(attr & console.FOREGROUND_RED 
-                         or attr & console.FOREGROUND_GREEN 
+        self.assertFalse(attr & console.FOREGROUND_RED
+                         or attr & console.FOREGROUND_GREEN
                          or attr & console.FOREGROUND_BLUE
                          or attr & console.FOREGROUND_BRIGHT)
 
@@ -110,6 +112,7 @@ class TestColors(TestCase):
 
 def suite():
     suite = TestSuite()
-    suite.addTest(defaultTestLoader.loadTestsFromTestCase(TestColors))
+    if is_win:
+        suite.addTest(defaultTestLoader.loadTestsFromTestCase(TestColors))
     return suite
 

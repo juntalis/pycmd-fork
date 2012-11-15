@@ -2,9 +2,10 @@
 # Unit tests for common.py
 #
 
-from unittest import TestCase, TestSuite, defaultTestLoader
+from unittest import TestCase, TestSuite, defaultTestLoader, skipUnless
 from common import parse_line, unescape, fuzzy_match
 from common import associated_application, full_executable_path, is_gui_application
+from . import is_win
 
 class TestParseLine(TestCase):
 
@@ -22,7 +23,7 @@ class TestParseLine(TestCase):
         ('dir 2>c:\\error.txt',
          ['dir', '2>', 'c:\\error.txt']),
 
-#       This fails 
+#       This fails
 #        ('dir2>c:\\error.txt',
 #         ['dir2', '>', 'c:\\error.txt']),
 
@@ -213,11 +214,12 @@ class TestFuzzyMatch(TestCase):
         for (substr, str, result) in self.match_tests:
             self.assertEqual(fuzzy_match(substr, str), result)
 
+@skipUnless(is_win, 'Windows-specific test case')
 class TestAppIdentification(TestCase):
     """
     Test various functions used for identifying the executable
     that will be run for a given command, and its type (GUI or console)
-    
+
     We rely on a few applications and file associations that are
     more-or-less standard in Windows; if things break here, make
     sure to check that the environment matches our assumptions.
@@ -236,21 +238,21 @@ class TestAppIdentification(TestCase):
                       'c:\\windows\\winhlp32': 'c:\\windows\\winhlp32.exe',
                       'c:\\windows\\winhlp32.exe': 'c:\\windows\\winhlp32.exe',}
 
-    standard_app_types = {'c:\\windows\\notepad.exe': True, 
+    standard_app_types = {'c:\\windows\\notepad.exe': True,
                           'c:\\windows\\system32\\cmd.exe': False, }
-                      
+
     def testAssociatedApplication(self):
         """
         Test the (registry-based) detection of the app associated to
         an extension
         """
         for ext, app in self.standard_associations.items():
-            self.assertEqual(associated_application(ext).strip('"').lower(), 
+            self.assertEqual(associated_application(ext).strip('"').lower(),
                              app.lower())
 
     def testFullExecutablePath(self):
         """
-        Test the function that tries to find out the actual executable 
+        Test the function that tries to find out the actual executable
         that will be spawned for a command
         """
         for cmd, app in self.standard_app_locations.items():
@@ -269,6 +271,7 @@ def suite():
     suite = TestSuite()
     suite.addTest(defaultTestLoader.loadTestsFromTestCase(TestParseLine))
     suite.addTest(defaultTestLoader.loadTestsFromTestCase(TestFuzzyMatch))
-    suite.addTest(defaultTestLoader.loadTestsFromTestCase(TestAppIdentification))
+    if is_win:
+        suite.addTest(defaultTestLoader.loadTestsFromTestCase(TestAppIdentification))
     return suite
 
