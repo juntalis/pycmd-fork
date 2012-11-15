@@ -1,10 +1,12 @@
 #
 # Common utility functions
 #
-import os, string, fsm, _winreg, pefile, mmap, sys, traceback
+import os, string, fsm, _winreg, pefile, mmap, sys, time
 import re
-import pycmd_public
+from clib.win32api import ExpandEnvironmentStrings
 
+# Check if we're running in PyPy.
+PYPY = hasattr(sys, 'pypy_version_info')
 
 # Stop points when navigating one word at a time
 word_sep = [' ', '\t', '\\', '-', '_', '.', '/', '$', '&', '=', '+', '@', ':', ';']
@@ -25,6 +27,37 @@ redir_file_tokens = redir_file_all + [d + c for d in digit_chars for c in redir_
 
 # All command splitting tokens
 sep_tokens = seq_tokens + redir_file_tokens
+class memoize(object):
+    """ Memoize With Timeout """
+    _caches = {}
+    _timeouts = {}
+    def __init__(self, timeout=0):
+        self.timeout = timeout
+    def collect(self):
+        """Clear cache of results which have timed out"""
+        for func in self._caches:
+            cache = {}
+            for key in self._caches[func]:
+                if (time.time() - self._caches[func][key][1]) < self._timeouts[func]:
+                    cache[key] = self._caches[func][key]
+            self._caches[func] = cache
+    def __call__(self, f):
+        self.cache = self._caches[f] = {}
+        self._timeouts[f] = self.timeout
+        def func(*args, **kwargs):
+            kw = kwargs.items()
+            kw.sort()
+            key = (args, tuple(kw))
+            try:
+                v = self.cache[key]
+                if self.timeout == 0: return v[0]
+                if (time.time() - v[1]) > self.timeout:
+                    raise KeyError
+            except KeyError:
+                v = self.cache[key] = f(*args, **kwargs), time.time()
+            return v[0]
+        func.func_name = f.func_name
+        return func
 
 def parse_line(line):
     """Tokenize a command line based on whitespace while observing quotes"""
@@ -113,7 +146,7 @@ def parse_line(line):
 
 def unescape(string):
     """Unescape string from ^ escaping. ^ inside double quotes is ignored"""
-    if (string == None):
+    if string is None:
         return None
     result = u''
     in_quotes = False
@@ -151,13 +184,13 @@ def expand_tilde(string):
     return string
 
 
-def expand_env_vars(string):
+def old_expand_env_vars(string):
     """
     Return an expanded version of the string by inlining the values of the
     environment variables. Also replaces ~ with %HOME% or %USERPROFILE%.
     The provided string is expected to be a single token of a command.
     """
-    # Expand tilde 
+    # Expand tilde
     string = expand_tilde(string)
 
     # Expand all %variable%s
@@ -174,6 +207,16 @@ def expand_env_vars(string):
     return string
 
 
+def expand_env_vars(sinput):
+    """
+    Return an expanded version of the string by inlining the values of the
+    environment variables. Also replaces ~ with %HOME% or %USERPROFILE%.
+    The provided string is expected to be a single token of a command.
+    """
+    sinput = expand_tilde(sinput)
+    sinput = ExpandEnvironmentStrings(sinput)
+    return sinput
+@memoize()
 def split_nocase(string, separator):
     """Split a string based on the separator while ignoring case"""
     chunks = []
@@ -186,7 +229,7 @@ def split_nocase(string, separator):
         pos = string.lower().find(separator.lower())
 
     chunks.append(string)
-    return (chunks, seps)
+    return chunks, seps
 
 def fuzzy_match(substr, str, prefix_only = False):
     """
@@ -227,15 +270,24 @@ def abbrev_string(string):
 
     return string_abbrev
 
+_exec_exts = None
 
-def has_exec_extension(file_name):
+def exec_exts():
+    global _exec_exts
+    if _exec_exts is None:
+        _exec_exts = os.environ['PATHEXT'].lower().split(';')
+        if '.dll' in _exec_exts: _exec_exts.remove('.dll')
+    return _exec_exts
+@memoize()
+def _is_exec_extension(fext):
+    return fext in exec_exts()
+def has_exec_extension(filename):
     """Check whether the specified file is executable, i.e. its extension is .exe, .com or .bat"""
-    return (file_name.endswith('.com') 
-            or file_name.endswith('.exe') 
-            or file_name.endswith('.bat')
-            or file_name.endswith('.cmd'))
+    fileext = filename.lower().splitext()[0]
+    return _is_exec_extension(fileext)
 
 
+@memoize()
 def strip_extension(file_name):
     """Remove extension, if present"""
     dot = file_name.rfind('.')
@@ -245,37 +297,41 @@ def strip_extension(file_name):
         return file_name
 
 
-def contains_special_char(string):
+@memoize()
+def contains_special_char(s):
     """Check whether the string contains a character that requires quoting"""
-    return string.find(' ') >= 0 or string.find('&') >= 0
+    return len(s) > 0 and ' ' in s or '&' in s
 
 
-def starts_with_special_char(string):
+@memoize()
+def starts_with_special_char(s):
     """Check whether the string STARTS with a character that requires quoting"""
-    return string.find(' ') == 0 or string.find('&') == 0
+    return len(s) > 0 and s[0] in [' ', '&']
 
 
+@memoize()
 def associated_application(ext):
     """
-    Scan the registry to find the application associated to a given file 
+    Scan the registry to find the application associated to a given file
     extension.
     """
     try:
         file_class = _winreg.QueryValue(_winreg.HKEY_CLASSES_ROOT, ext) or ext
         action = _winreg.QueryValue(_winreg.HKEY_CLASSES_ROOT, file_class + '\\shell') or 'open'
-        assoc_key = _winreg.OpenKey(_winreg.HKEY_CLASSES_ROOT, 
+        assoc_key = _winreg.OpenKey(_winreg.HKEY_CLASSES_ROOT,
                                     file_class + '\\shell\\' + action + '\\command')
         open_command = _winreg.QueryValueEx(assoc_key, None)[0]
-        
+
         # We assume a value `similar to '<command> %1 %2'
         return expand_env_vars(parse_line(open_command)[0])
-    except WindowsError, e:
+    except WindowsError:
         return None
 
 
+@memoize(timeout=2)
 def full_executable_path(app_unicode):
     """
-    Compute the full path of the executable that will be spawned 
+    Compute the full path of the executable that will be spawned
     for the given command
     """
     app = app_unicode.encode(sys.getfilesystemencoding())
@@ -290,7 +346,7 @@ def full_executable_path(app_unicode):
     if ext != '':
         extensions_to_search = [ext]
     else:
-        extensions_to_search = ['.exe', '.com', '.bat', '.cmd']
+        extensions_to_search = exec_exts()
 
     # Determine the possible locations
     if dir:
@@ -311,51 +367,33 @@ def full_executable_path(app_unicode):
     return None
 
 
+@memoize(timeout=5)
 def is_gui_application(executable):
     """
     Try to guess if an executable is a GUI or console app.
-    Note that the full executable name of an .exe file is 
+    Note that the full executable name of an .exe file is
     required (use e.g. full_executable_path() to get it)
     """
     result = False
     try:
         fd = os.open(executable, os.O_RDONLY)
         m = mmap.mmap(fd, 0, access = mmap.ACCESS_READ)
-        
+
         try:
             pe = pefile.PE(data = m, fast_load=True)
             if pefile.SUBSYSTEM_TYPE[pe.OPTIONAL_HEADER.Subsystem] == 'IMAGE_SUBSYSTEM_WINDOWS_GUI':
                 # We only return true if all went well
                 result = True
-        except pefile.PEFormatError, e:
+        except pefile.PEFormatError:
             # There's not much we can do if pefile fails
             pass
 
         m.close()
         os.close(fd)
-    except Exception, e:
+    except Exception:
         # Not much we can do for exceptions
         pass
 
     # Return False when not sure
     return result
 
-def apply_settings(settings_file):
-    """
-    Execute a configuration file (if it exists), overriding values from the
-    global configuration objects (created when this module is loaded)
-    """
-    if os.path.exists(settings_file):
-        try:
-            # We initialize the dictionary to readily contain the settings
-            # structures; anything else needs to be explicitly imported
-            execfile(settings_file, pycmd_public.__dict__)
-        except Exception, e:
-            print 'Error encountered when loading ' + settings_file
-            print 'Subsequent settings will NOT be applied!'
-            traceback.print_exc()
-
-def sanitize_settings():
-    """Sanitize all the configuration instances"""
-    pycmd_public.appearance.sanitize()
-    pycmd_public.behavior.sanitize()

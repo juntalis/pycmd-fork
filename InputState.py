@@ -1,6 +1,6 @@
 from CommandHistory import CommandHistory
 from common import fuzzy_match, word_sep
-import win32clipboard as wclip
+import clib.win32api as wclip
 
 class ActionCode:
     """
@@ -166,13 +166,13 @@ class InputState:
         # Add the previous state as an undo state if needed
         if self.changed():
             if action in self.batch_actions \
-                    or (action in self.insert_actions + self.delete_actions \
+                    or (action in self.insert_actions + self.delete_actions
                             and action != self.last_action) \
                             or action == ActionCode.ACTION_UNDO_EMACS:
                 self.undo.append((self.prev_before_cursor, self.prev_after_cursor))
                 self.redo = []
             if action in self.batch_actions \
-                    or (action in self.insert_actions + self.delete_actions \
+                    or (action in self.insert_actions + self.delete_actions
                             and action != self.last_action) \
                             or action == ActionCode.ACTION_UNDO:
                 self.undo_emacs.append((self.prev_before_cursor, self.prev_after_cursor))
@@ -223,7 +223,7 @@ class InputState:
         End key
         Also handle text selection according to flag
         """
-        self.before_cursor = self.before_cursor + self.after_cursor
+        self.before_cursor += self.after_cursor
         self.after_cursor = ''
         if not select:
             self.reset_selection()
@@ -352,10 +352,10 @@ class InputState:
 
     def key_copy(self):
         """Copy selection to clipboard"""
-        wclip.OpenClipboard()
-        wclip.EmptyClipboard()
-        wclip.SetClipboardText(self.get_selection())
-        wclip.CloseClipboard()
+        with wclip.Clipboard() as clip:
+            text = self.get_selection()
+            print text
+            clip.text = text
         self.history.reset()
 
     def key_cut(self):
@@ -366,10 +366,9 @@ class InputState:
 
     def key_paste(self):
         """Paste from clipboard"""
-        wclip.OpenClipboard()
-        if wclip.IsClipboardFormatAvailable(wclip.CF_TEXT):
-            text = wclip.GetClipboardData()
-            
+        with wclip.Clipboard() as clip:
+            text = clip.text
+            if not text: return
             # Purge garbage chars that some apps put in the clipboard
             if text.find('\0') >= 0:
                 text = text[:text.find('\0')]
@@ -382,8 +381,7 @@ class InputState:
                 self.delete_selection()
             self.before_cursor = self.before_cursor + text
             self.reset_selection()
-        wclip.CloseClipboard()
-        self.history.reset()
+            self.history.reset()
 
     def key_insert(self, text):
         """Insert text at the current cursor position"""
@@ -404,7 +402,7 @@ class InputState:
 
     def key_undo(self):
         """Undo the last action or group of actions"""
-        if self.undo != []:
+        if len(self.undo) > 0:
             self.redo.append((self.before_cursor, self.after_cursor))
             (before, after) = self.undo.pop()
             self.before_cursor = before
@@ -413,7 +411,7 @@ class InputState:
 
     def key_undo_emacs(self):
         """Emacs-style undo"""
-        if self.undo_emacs != []:
+        if len(self.undo_emacs) > 0:
             if self.last_action != ActionCode.ACTION_UNDO_EMACS:
                 self.undo_emacs.append((self.before_cursor, self.after_cursor))
                 self.undo_emacs_index -= 1
@@ -427,7 +425,7 @@ class InputState:
 
     def key_redo(self):
         """Redo the last action or group of actions"""
-        if self.redo != []:
+        if len(self.redo) > 0:
             self.undo.append((self.before_cursor, self.after_cursor))
             (before, after) = self.redo.pop()
             self.before_cursor = before
@@ -440,6 +438,7 @@ class InputState:
 
         This expands the current token based by looking at the input
         history, similar to Emacs' Alt-/
+        :type text: str
         """
         if self.expand_matches == [] or self.last_action != ActionCode.ACTION_EXPAND:
             # Re-initialize the list of matches

@@ -1,21 +1,15 @@
-import sys, os, tempfile, signal, time, traceback, codecs
-import win32console, win32gui, win32con
-
-from common import parse_line, unescape, sep_tokens, sep_chars
-from common import expand_tilde, expand_env_vars
-from common import associated_application, full_executable_path, is_gui_application
-from completion import complete_file, complete_wildcard, complete_env_var, find_common_prefix, has_wildcards, wildcard_to_regex
+import sys, os, tempfile, signal, time, traceback, codecs, console
+from clib import win32api
+from common import *
 from InputState import ActionCode, InputState
 from DirHistory import DirHistory
-import console
+from console import *
 from sys import stdout, stderr
-from console import move_cursor, get_cursor, cursor_backward, set_cursor_visible
-from console import read_input, write_input
-from console import is_ctrl_pressed, is_alt_pressed, is_shift_pressed, is_control_only
-from console import scroll_buffer, get_viewport
-from console import remove_escape_sequences
-from pycmd_public import color, appearance, behavior
-from common import apply_settings, sanitize_settings
+from completion import *
+from pycmd_public import color
+from configuration import appearance, behavior, apply_settings, sanitize as sanitize_settings, get_hooks, hook_types
+from aliases import get_alias, alias_main
+from userconfig import init_user, get_custom_command
 
 pycmd_data_dir = None
 pycmd_install_dir = None
@@ -42,6 +36,7 @@ def init():
     global pycmd_install_dir
     pycmd_install_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
 
+    init_user(pycmd_data_dir, pycmd_install_dir)
     # Current state of the input (prompt, entered chars, history)
     global state
     state = InputState()
@@ -71,10 +66,14 @@ def main():
     title_prefix = ""
 
     # Apply global and user configurations
-    apply_settings(pycmd_install_dir + '\\init.py')
-    apply_settings(pycmd_data_dir + '\\init.py')
+    apply_settings(pycmd_install_dir + '\\init.py', (pycmd_install_dir, pycmd_data_dir))
+    apply_settings(pycmd_data_dir + '\\init.py', (pycmd_install_dir, pycmd_data_dir))
     sanitize_settings()
 
+    init_hooks = get_hooks(hook_types[0])
+    if len(init_hooks) > 0:
+        for hook in init_hooks.values():
+            hook()
     # Parse arguments
     arg = 1
     while arg < len(sys.argv):
@@ -83,13 +82,13 @@ def main():
                 for t in sys.argv[arg+1:]]
         if switch in ['/K', '-K']:
             # Run the specified command and continue
-            if rest != []:
+            if len(rest) > 0:
                 run_command(rest)
                 dir_hist.visit_cwd()
                 break
         elif switch in ['/C', '-C']:
             # Run the specified command end exit
-            if rest != []:
+            if len(rest) > 0:
                 run_command(rest)
             internal_exit()
         elif switch in ['/H', '/?', '-H']:
@@ -108,7 +107,7 @@ def main():
                 stderr.write('PyCmd: no script specified to \'-i\'\n')
                 print_usage()
                 internal_exit()
-            apply_settings(sys.argv[arg + 1])
+            apply_settings(sys.argv[arg + 1], (pycmd_install_dir, pycmd_data_dir))
             sanitize_settings()
             arg += 1
         elif switch in ['/Q', '-Q']:
@@ -125,7 +124,7 @@ def main():
         # Print some splash text
         try:
             from buildinfo import build_info
-        except ImportError, ie:
+        except ImportError:
             build_info = '<no build info>'
 
         print
@@ -204,16 +203,17 @@ def main():
             select = auto_select or is_shift_pressed(rec)
 
             # Will be overriden if Shift-PgUp/Dn is pressed
-            force_repaint = not is_control_only(rec)    
+            force_repaint = not is_control_only(rec)
 
             #print '\n\n', rec.keyDown, rec.char, rec.virtualKeyCode, rec.controlKeyState, '\n\n'
+            recChar = rec.CU.Char if PYPY else rec.Char
             if is_ctrl_pressed(rec) and not is_alt_pressed(rec):  # Ctrl-Something
-                if rec.Char == chr(4):                  # Ctrl-D
+                if recChar == chr(4):                  # Ctrl-D
                     if state.before_cursor + state.after_cursor == '':
                         internal_exit('\r\nBye!')
                     else:
                         state.handle(ActionCode.ACTION_DELETE)
-                elif rec.Char == chr(31):                   # Ctrl-_
+                elif recChar == chr(31):                   # Ctrl-_
                     state.handle(ActionCode.ACTION_UNDO_EMACS)
                     auto_select = False
                 elif rec.VirtualKeyCode == 75:          # Ctrl-K
@@ -271,21 +271,21 @@ def main():
                     auto_select = False
                 elif rec.VirtualKeyCode == 8:           # Ctrl-Backspace
                     state.handle(ActionCode.ACTION_BACKSPACE_WORD)
-                elif rec.VirtualKeyCode == 90:  
+                elif rec.VirtualKeyCode == 90:
                     if not is_shift_pressed(rec):       # Ctrl-Z
                         state.handle(ActionCode.ACTION_UNDO)
                     else:                               # Ctrl-Shift-Z
                         state.handle(ActionCode.ACTION_REDO)
                     auto_select = False
             elif is_alt_pressed(rec) and not is_ctrl_pressed(rec):      # Alt-Something
-                if rec.VirtualKeyCode in [37, 39] + range(49, 59):      # Dir history 
+                if rec.VirtualKeyCode in [37, 39] + range(49, 59):      # Dir history
                     if state.before_cursor + state.after_cursor == '':
                         state.reset_prev_line()
                         if rec.VirtualKeyCode == 37:            # Alt-Left
                             changed = dir_hist.go_left()
-                        elif rec.VirtualKeyCode == 39:          # Alt-Right     
+                        elif rec.VirtualKeyCode == 39:          # Alt-Right
                             changed = dir_hist.go_right()
-                        else:                                   # Alt-1..Alt-9        
+                        else:                                   # Alt-1..Alt-9
                             changed = dir_hist.jump(rec.VirtualKeyCode - 48)
                         if changed:
                             state.prev_prompt = state.prompt
@@ -315,7 +315,7 @@ def main():
                         dir_hist.check_overflow(remove_escape_sequences(state.prev_prompt))
                         stdout.write(state.prev_prompt)
                     else:
-                        state.handle(ActionCode.ACTION_DELETE_WORD) 
+                        state.handle(ActionCode.ACTION_DELETE_WORD)
                 elif rec.VirtualKeyCode == 87:          # Alt-W
                     state.handle(ActionCode.ACTION_COPY)
                     state.reset_selection()
@@ -337,7 +337,7 @@ def main():
                 scrolling = True
                 force_repaint = False
             else:                                       # Clean key (no modifiers)
-                if rec.Char == chr(0):                  # Special key (arrows and such)
+                if recChar == chr(0):                  # Special key (arrows and such)
                     if rec.VirtualKeyCode == 37:        # Left arrow
                         state.handle(ActionCode.ACTION_LEFT, select)
                     elif rec.VirtualKeyCode == 39:      # Right arrow
@@ -352,10 +352,10 @@ def main():
                         state.handle(ActionCode.ACTION_NEXT)
                     elif rec.VirtualKeyCode == 46:      # Delete
                         state.handle(ActionCode.ACTION_DELETE)
-                elif rec.Char == chr(13):               # Enter
+                elif recChar == chr(13):               # Enter
                     state.history.reset()
                     break
-                elif rec.Char == chr(27):               # Esc
+                elif recChar == chr(27):               # Esc
                     if scrolling:
                         scrolling = False
                     else:
@@ -364,7 +364,7 @@ def main():
                                      pycmd_data_dir + '\\history',
                                      1000)
                         auto_select = False
-                elif rec.Char == '\t':                  # Tab
+                elif recChar == '\t':                  # Tab
                     stdout.write(state.after_cursor)        # Move cursor to the end
 
                     tokens = parse_line(state.before_cursor)
@@ -404,9 +404,9 @@ def main():
                             move_cursor(c_x, console.get_buffer_size()[1] - offset_from_bottom)
                             stdout.write('\n' + ' ' * len(message))
                             move_cursor(c_x, console.get_buffer_size()[1] - offset_from_bottom)
-                            if rec.Char != '\t':
+                            if recChar != '\t':
                                 continue
-                            
+
                         stdout.write('\n')
                         for line in range(0, num_lines):
                             # Print one line
@@ -491,7 +491,7 @@ def internal_cd(args):
 def internal_exit(message = ''):
     """The EXIT command, with an optional goodbye message"""
     deinit()
-    if ((not behavior.quiet_mode) and message != ''):
+    if not behavior.quiet_mode and len(message) > 0:
         print message
     sys.exit()
 
@@ -512,8 +512,34 @@ def run_command(tokens):
             # GUI application. If it is, spawn the process and then get on with
             # life.
             cmd = expand_env_vars(tokens[0].strip('"'))
+            main_hooks = get_hooks(hook_types[1])
+            if len(main_hooks) > 0:
+                for hook in main_hooks.values():
+                    (handled, results) = hook(cmd, tokens[1:])
+                    if handled:
+                        return
+                    if results is not None:
+                        (cmd, tokens) = results
+                        tokens = [cmd] + tokens
+            if cmd.lower() == u'alias':
+                alias_main(tokens[1:])
+                return
+            custom_cmd = get_custom_command(cmd.lower())
+            if custom_cmd is not None:
+                result = custom_cmd(tokens[1:])
+                if result is None:
+                    return
+                if len(result) > 0:
+                    cmd = result[0]
+                    tokens = result
+                else:
+                    return
+            alias = get_alias(cmd.lower())
+            if alias is not None:
+                cmd = alias[0]
+                tokens = alias + tokens[1:]
             dir, name = os.path.split(cmd)
-            ext = os.path.splitext(name)[1]
+            ext = os.path.splitext(name)[1].lower()
 
             if ext in ['', '.exe', '.com', '.bat', '.cmd']:
                 # Executable given
@@ -526,7 +552,7 @@ def run_command(tokens):
                     # No application will be spawned if the file doesn't exist
                     app = None
 
-            if app:
+            if app is not None:
                 executable = full_executable_path(app)
                 if executable and os.path.splitext(executable)[1].lower() == '.exe':
                     # This is an exe file, try to figure out whether it's a GUI
@@ -540,10 +566,10 @@ def run_command(tokens):
         # Regular (external) command
         start_time = time.time()
         run_in_cmd(tokens)
-        console_window = win32console.GetConsoleWindow()
-        if win32gui.GetForegroundWindow() != console_window and time.time() - start_time > 15:
+        console_window = win32api.GetConsoleWindow()
+        if win32api.GetForegroundWindow() != console_window and time.time() - start_time > 15:
             # If the window is inactive, flash after long tasks
-            win32gui.FlashWindowEx(console_window, win32con.FLASHW_ALL, 3, 750)
+            win32api.FlashWindow(console_window, win32api.FLASHW_ALL, 3, 750)
 
 def run_in_cmd(tokens):
     pseudo_vars = ['CD', 'DATE', 'ERRORLEVEL', 'RANDOM', 'TIME']
@@ -680,10 +706,12 @@ if __name__ == '__main__':
     try:
         init()
         main()
-    except Exception, e:        
+    except Exception, e:
+        if pycmd_data_dir is None:
+            pycmd_data_dir = os.path.abspath(os.path.dirname(__file__))
         report_file_name = (pycmd_data_dir
-                            + '\\crash-' 
-                            + time.strftime('%Y%m%d_%H%M%S') 
+                            + '\\crash-'
+                            + time.strftime('%Y%m%d_%H%M%S')
                             + '.log')
         print '\n'
         print '************************************'
@@ -693,7 +721,7 @@ if __name__ == '__main__':
         traceback.print_exc(file=report_file)
         report_file.close()
         traceback.print_exc()
-        print 
+        print
         print 'Crash report written to:\n  ' + report_file_name
         print
         print 'Press any key to exit... '

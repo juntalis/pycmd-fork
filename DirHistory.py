@@ -1,6 +1,7 @@
-import os, sys
-from console import get_cursor, move_cursor, get_buffer_size
+import sys
 from sys import stdout
+import os
+from console import get_cursor, move_cursor, get_buffer_size
 from pycmd_public import appearance, color
 
 class DirHistory:

@@ -24,22 +24,23 @@ def abbrev_path(path = None):
     if not path:
         path = os.getcwd().decode(sys.getfilesystemencoding())
         path = path[0].upper() + path[1:]
-    current_dir = path[ : 3]
-    path = path[3 : ]
-    path_abbrev = current_dir[ : 2]
+    return os.path.basename(path)
+#	current_dir = path[: 3]
+#	path = path[3:]
+#	path_abbrev = current_dir[: 2]
 
-    for elem in path.split('\\')[ : -1]:
-        elem_abbrev = common.abbrev_string(elem)
-        for other in os.listdir(current_dir):
-            if os.path.isdir(current_dir + '\\' + other) and common.abbrev_string(other).lower() == elem_abbrev.lower() and other.lower() != elem.lower():
+#	for elem in path.split('\\')[: -1]:
+#		elem_abbrev = common.abbrev_string(elem)
+#		for other in os.listdir(current_dir):
+#				other).lower() == elem_abbrev.lower() and other.lower() != elem.lower():
                 # Found other directory with the same abbreviation
                 # In this case, we use the entire name
-                elem_abbrev = elem
-                break
-        current_dir += '\\' + elem
-        path_abbrev += '\\' + elem_abbrev
+#				elem_abbrev = elem
+#				break
+#		current_dir += '\\' + elem
+#		path_abbrev += '\\' + elem_abbrev
 
-    return path_abbrev + '\\' + path.split('\\')[-1]
+#	return path_abbrev + '\\' + path.split('\\')[-1]
 
 
 def abbrev_path_prompt():
@@ -49,7 +50,8 @@ def abbrev_path_prompt():
     This is the default PyCmd prompt. It uses the abbrev_path() function to
     obtain the shortened path and appends the typical '> '.
     """
-    return abbrev_path() + u'> '
+    #return abbrev_path() + u'> '
+    return u'[' + abbrev_path() + u']$ '
 
 
 class color(object):
@@ -184,10 +186,19 @@ class Behavior(_Settings):
         # Select the completion mode; currently supported: 'bash'
         self.completion_mode = 'bash'
 
+        # Select the database backend for various custom stuff; currently supported:
+        # pickle - Use pickle to serialize/deserialize data. (Will aim to use cPickle if possible)
+        # snappy - Same as pickle, but use the snappy compression library to compress the file. (See ReadMe)
+        # sqlite3 - Use an sqlite database as the backend.
+        # leveldb - Use LevelDB. (See readme)
+        self.data_backend = 'pickle'
     def sanitize(self):
         if not self.completion_mode in ['bash']:
             print 'Invalid setting "' + self.completion_mode + '" for "completion_mode" -- using default "bash"'
             self.completion_mode = 'bash'
+        if not self.data_backend in ['pickle', 'snappy', 'sqlite3', 'leveldb']:
+            print 'Invalid setting "' + self.data_backend + '" for "data_backend" -- using default "pickle"'
+            self.data_backend = 'pickle'
 
 
 # Initialize global configuration instances with default values

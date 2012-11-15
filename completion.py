@@ -31,7 +31,7 @@ def complete_file(line):
         # Try the alternate completion
         (completed, completions) = complete_file_alternate(line)
 
-    return (completed, completions)
+    return completed, completions
 
 def complete_file_simple(line):
     """
@@ -136,7 +136,7 @@ def complete_file_simple(line):
                 completions_path_nice.append(completions_path[i])
         completions += completions_path_nice
 
-    if completions != []:
+    if len(completions) > 0:
         # Find the longest common sequence
         common_string = find_common_prefix(prefix, completions)
             
@@ -176,10 +176,10 @@ def complete_file_simple(line):
                 result += end_quote
                 result += ' '
 
-        return (result, completions)
+        return result, completions
     else:
         # No expansion was made, return original line
-        return (line, [])
+        return line, []
 
 
 def complete_file_alternate(line):
@@ -236,7 +236,7 @@ def complete_file_alternate(line):
     completions_files = [elem for elem in completions if os.path.isfile(dir_to_complete + '\\' + elem)]
     completions = completions_dirs + completions_files
 
-    if completions != []:
+    if len(completions) > 0:
         # Find the longest common sequence
         common_string = find_common_prefix(prefix, completions)
             
@@ -263,10 +263,10 @@ def complete_file_alternate(line):
         result += last_token_prefix + start_quote
         result += last_token[:len(last_token) - len(token)]
         result += completed_file
-        return (result, completions)
+        return result, completions
     else:
         # No expansion was made, return original line
-        return (line, [])
+        return line, []
 
 
 def complete_wildcard(line):
@@ -315,7 +315,7 @@ def complete_wildcard(line):
     completions_files = [elem for elem in completions if os.path.isfile(dir_to_complete + '\\' + elem)]
     completions = completions_dirs + completions_files
 
-    if completions != []:
+    if len(completions) > 0:
         completed_suffixes = []
         for c in completions:
             match = matcher.match(c)
@@ -367,10 +367,10 @@ def complete_wildcard(line):
                 result += end_quote
                 result += ' '
 
-        return (result, completions)
+        return result, completions
     else:
         # No expansion was made, return original line
-        return (line, [])
+        return line, []
 
 
 def complete_env_var(line):
@@ -404,7 +404,7 @@ def complete_env_var(line):
 
     completions.sort()
 
-    if completions != []:
+    if len(completions) > 0:
         # Find longest prefix
         common_string = find_common_prefix(prefix, completions)
         
@@ -418,12 +418,12 @@ def complete_env_var(line):
         
         if len(completions) == 1:
             result += '%' + quote
-            return (result, [])
+            return result, []
         else:
-            return (result, completions)
+            return result, completions
     else:
         # No completion possible, return original line
-        return (line, [])
+        return line, []
 
 
 
@@ -471,7 +471,7 @@ def find_common_prefix(original, completions):
 def wildcard_to_regex(pattern):
     """
     Transform a wildcard pattern into a compiled regex object.
-    This also handles escaping as needed.    
+    This also handles escaping as needed.
     """
     # Transform pattern into regexp
     translations = [('\\', '\\\\'),
