@@ -1,9 +1,15 @@
 #
 # Common utility functions
 #
-import os, string, fsm, _winreg, pefile, mmap, sys, time
+import os, string, fsm, pefile, mmap, sys, time
 import re
-from clib.win32api import ExpandEnvironmentStrings
+try:
+    import _winreg
+    from clib.win32api import ExpandEnvironmentStrings
+except ImportError:
+    # Have to stub these to make sure Travis doesn't fail.
+    _winreg = None
+    ExpandEnvironmentStrings = lambda s: s
 
 # Check if we're running in PyPy.
 PYPY = hasattr(sys, 'pypy_version_info')
