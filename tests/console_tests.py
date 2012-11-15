@@ -3,11 +3,18 @@
 #
 
 from unittest import TestCase, TestSuite, defaultTestLoader, skipUnless
-import console
 from sys import stdout
-from console import get_text_attributes, set_text_attributes
-from pycmd_public import color
 from . import is_win
+if is_win:
+    import console
+    from console import get_text_attributes, set_text_attributes
+    from pycmd_public import color
+else:
+    color = None
+    console = None
+    get_text_attributes = lambda: None
+    set_text_attributes = lambda x: None
+
 
 @skipUnless(is_win, 'Windows-specific test case')
 class TestColors(TestCase):

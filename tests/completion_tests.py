@@ -30,7 +30,7 @@ class TestWildcardMatching(TestCase):
         """Test the matching and grouping of shell patterns"""
         for name, pattern, groups in self.matches:
             result = wildcard_to_regex(pattern).match(name)
-            if result != None:
+            if result is not None:
                 self.assertEqual(result.groups(), groups)
             else:
                 self.assertEqual(None, groups)

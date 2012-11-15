@@ -2,7 +2,7 @@
 # Unit tests for common.py
 #
 
-from unittest import TestCase, TestSuite, defaultTestLoader, skipUnless
+from unittest2 import TestCase, TestSuite, defaultTestLoader, skipUnless
 from common import parse_line, unescape, fuzzy_match
 from common import associated_application, full_executable_path, is_gui_application
 from . import is_win
