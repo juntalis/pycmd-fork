@@ -1,6 +1,15 @@
-#!/usr/bin/env python
 # encoding: utf-8
 """
+PyCmdDB.py
+The database implementations in this file were actually just
+an excuse I needed to force myself to try and get the repository
+version of pyleveldb compiled on Windows. (Only to realize after
+doing so that leveldb didn't really fit for the functionality I
+was looking to implement) As a result, the whole implementation
+is pretty forced, and not written all that well. When I have some
+time, I'll be looking to rewrite most - if not all - of this file.
+
+
 This program is free software. It comes without any warranty, to
 the extent permitted by applicable law. You can redistribute it
 and/or modify it under the terms of the Do What The Fuck You Want
@@ -18,10 +27,12 @@ except ImportError:
 
 backends = {}
 
-def _validate_key(key):
+def _validate_key(key, silent=False):
     allowed_chars = letters + digits + '_- '
     check = str(key).translate(None, allowed_chars)
     if len(check) > 0:
+        if silent:
+            return False
         raise KeyError('Invalid characters found in the key specified: %s' % ', '.join(list(check)))
     return True
 
@@ -286,7 +297,8 @@ class PickleBackend(BaseBackend):
 
     def _geta(self, key, nocheck=False):
         key = str(key)
-        if not nocheck: _validate_key(key)
+        if not nocheck and not _validate_key(key, True):
+            return None
         return None if not self.has(key) else self.db['data'][key]
 
     def _deleteall(self):
