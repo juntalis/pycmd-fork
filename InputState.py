@@ -1,6 +1,6 @@
 from CommandHistory import CommandHistory
-from common import fuzzy_match, word_sep
-import clib.win32api as wclip
+from common import word_sep
+import win32api as wclip
 
 class ActionCode:
     """

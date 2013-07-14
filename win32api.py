@@ -1,3 +1,4 @@
+# Thinking about porting this over to cython.
 from ctypes import *
 from ctypes.wintypes import *
 import os as _os
@@ -543,22 +544,17 @@ has no effect on memory objects allocated with GMEM_FIXED. """
 
 def ReadOneConsoleInput(handle):
 	buf = ONE_INPUT_RECORD()
-	buflen = DWORD(1)
-	if ReadConsoleInput(handle, cast(buf, PINPUT_RECORD), 1, byref(buflen)) and buflen.value == 1:
+	dw = DWORD(0)
+	if ReadConsoleInput(handle, cast(buf, PINPUT_RECORD), 1, byref(dw)) and dw.value == 1:
 		return buf[0]
 	else:
 		raise WindowsError('Could not read one input event.')
 
-
 def WriteOneConsoleInput(handle, record):
-	buf = ONE_INPUT_RECORD()
-	buf[0] = record
-	buflen = DWORD(1)
-	return WriteConsoleInput(handle, cast(buf, PINPUT_RECORD), 1, byref(buflen)) and buflen.value == 1
-
+	dw = DWORD(0)
+	assert(WriteConsoleInput(handle, cast(record, PINPUT_RECORD), 1, byref(dw)) == 1)
 
 class Clipboard(object):
-	_hwnd_ = NULL
 
 	def __init__(self, hwnd = NULL):
 		self._hwnd_ = hwnd
@@ -570,21 +566,15 @@ class Clipboard(object):
 		return self
 
 	#noinspection PyUnusedLocal
-	def __exit__(self, type, value, traceback):
+	def __exit__(self, typ, value, traceback):
 		if not CloseClipboard():
 			raise WindowsError('Could not close the windows clipboard.')
 
-	def __setattr__(self, key, value):
-		if key == 'text':
-			self.__set_text__(value)
-		else:
-			super(Clipboard, self).__setattr__(key, value)
+	@property
+	def text(self): return self.__get_text__()
 
-	def __getattr__(self, key):
-		if key == 'text':
-			return self.__get_text__()
-		else:
-			return super(Clipboard, self).__getattribute__(key)
+	@text.setter
+	def text(self, value): self.__set_text__(value)
 
 	def __get_text__(self):
 		if not IsClipboardFormatAvailable(CF_TEXT):

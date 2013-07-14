@@ -1,11 +1,11 @@
 #
 # Common utility functions
 #
-import os, string, fsm, pefile, mmap, sys, time
-import re
+import string, mmap, sys, time, os, fsm, pefile, re
+
 try:
     import _winreg
-    from clib.win32api import ExpandEnvironmentStrings
+    from win32api import ExpandEnvironmentStrings
 except ImportError:
     # Have to stub these to make sure Travis doesn't fail.
     _winreg = None

@@ -1,9 +1,9 @@
 #
 # Common utility functions
 #
-import os, string, fsm, _winreg, pefile, mmap, sys, time
-import re
-from clib.win32api import ExpandEnvironmentStrings
+import re, pefile, fsm, os, time, sys, mmap, _winreg, string
+from win32api import ExpandEnvironmentStrings
+
 from libc.stdlib cimport malloc, free
 from libc.string cimport memset, strlen
 from cpython.string cimport PyString_FromStringAndSize
@@ -269,7 +269,7 @@ def split_nocase(string, separator):
     chunks.append(string)
     return chunks, seps
 
-def fuzzy_match(substr, str, prefix_only = False):
+def fuzzy_match(substr, subject, prefix_only = False):
     """
     Check if a substring is part of a string, while ignoring case and
     allowing for "fuzzy" matching, i.e. require that only the "words" in
@@ -282,7 +282,7 @@ def fuzzy_match(substr, str, prefix_only = False):
     pattern = [('\\b' if prefix_only else '') + '(' + word + ').*' for word in words]
     # print '\n\n', pattern, '\n\n'
     pattern = ''.join(pattern)
-    matches = re.search(pattern, str, re.IGNORECASE)
+    matches = re.search(pattern, subject, re.IGNORECASE)
     return [matches.span(i) for i in range(1, len(words) + 1)] if matches else []
 
 def old_abbrev_string(string):
@@ -409,8 +409,8 @@ def full_executable_path(app_unicode):
     # Split the app into a dir, a name and an extension; we
     # will configure our search for the actual executable based
     # on these
-    dir, file = os.path.split(app.strip('"'))
-    name, ext = os.path.splitext(file)
+    folder, filename = os.path.split(app.strip('"'))
+    name, ext = os.path.splitext(filename)
 
     # Determine possible executable extension
     if ext != '':
@@ -419,8 +419,8 @@ def full_executable_path(app_unicode):
         extensions_to_search = exec_exts()
 
     # Determine the possible locations
-    if dir:
-        paths_to_search = [dir]
+    if folder:
+        paths_to_search = [folder]
     else:
         paths_to_search = [os.getcwd()] + os.environ['PATH'].split(os.pathsep)
 

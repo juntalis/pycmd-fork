@@ -3,7 +3,7 @@
 #
 import sys
 from common import PYPY
-from clib.win32api import *
+from win32api import *
 
 global FOREGROUND_RED
 global FOREGROUND_GREEN

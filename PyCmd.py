@@ -1,15 +1,24 @@
-import sys, os, tempfile, signal, time, traceback, codecs, console
-from clib import win32api
+import sys
+import tempfile
+import signal
+import time
+import traceback
+from sys import stdout, stderr
+
+import os
+import codecs
+import console
 from common import *
 from InputState import ActionCode, InputState
 from DirHistory import DirHistory
 from console import *
-from sys import stdout, stderr
 from completion import *
 from pycmd_public import color
 from configuration import appearance, behavior, apply_settings, sanitize as sanitize_settings, get_hooks, hook_types
 from aliases import get_alias, alias_main
 from userconfig import init_user, get_custom_command
+import win32api
+
 
 pycmd_data_dir = None
 pycmd_install_dir = None
