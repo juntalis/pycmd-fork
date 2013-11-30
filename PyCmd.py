@@ -1,11 +1,7 @@
-import sys
 import tempfile
 import signal
-import time
 import traceback
-from sys import stdout, stderr
-
-import os
+import sys
 import codecs
 import console
 from common import *
@@ -19,7 +15,6 @@ from aliases import get_alias, alias_main
 from userconfig import init_user, get_custom_command
 import win32api
 
-
 pycmd_data_dir = None
 pycmd_install_dir = None
 state = None
@@ -27,6 +22,7 @@ dir_hist = None
 tmpfile = None
 
 def init():
+    sys.stdout = ColorOutputStream()
     # %APPDATA% is not always defined (e.g. when using runas.exe)
     if 'APPDATA' in os.environ.keys():
         APPDATA = '%APPDATA%'
@@ -106,14 +102,14 @@ def main():
             internal_exit()
         elif switch in ['/T', '-T']:
             if arg == len(sys.argv) - 1:
-                stderr.write('PyCmd: no title specified to \'-t\'\n')
+                sys.stderr.write('PyCmd: no title specified to \'-t\'\n')
                 print_usage()
                 internal_exit()
             title_prefix = sys.argv[arg + 1] + ' - '
             arg += 1
         elif switch in ['/I', '-I']:
             if arg == len(sys.argv) - 1:
-                stderr.write('PyCmd: no script specified to \'-i\'\n')
+                sys.stderr.write('PyCmd: no script specified to \'-i\'\n')
                 print_usage()
                 internal_exit()
             apply_settings(sys.argv[arg + 1], (pycmd_install_dir, pycmd_data_dir))
@@ -124,7 +120,7 @@ def main():
             behavior.quiet_mode = True
         else:
             # Invalid command line switch
-            stderr.write('PyCmd: unrecognized option `' + sys.argv[arg] + '\'\n')
+            sys.stderr.write('PyCmd: unrecognized option `' + sys.argv[arg] + '\'\n')
             print_usage()
             internal_exit()
         arg += 1
@@ -164,7 +160,7 @@ def main():
                 prev_total_len = len(remove_escape_sequences(state.prev_prompt) + state.prev_before_cursor + state.prev_after_cursor)
                 set_cursor_visible(False)
                 cursor_backward(len(remove_escape_sequences(state.prev_prompt) + state.prev_before_cursor))
-                stdout.write('\r')
+                sys.stdout.write('\r')
 
                 # Update the offset of the directory history in case of overflow
                 # Note that if the history display is marked as 'dirty'
@@ -173,13 +169,13 @@ def main():
                 dir_hist.check_overflow(remove_escape_sequences(state.prompt))
 
                 # Write current line
-                stdout.write(u'\r' + color.Fore.DEFAULT + color.Back.DEFAULT + appearance.colors.prompt +
+                sys.stdout.write('\r' + color.Fore.DEFAULT + color.Back.DEFAULT + appearance.colors.prompt +
                           state.prompt +
                           color.Fore.DEFAULT + color.Back.DEFAULT + appearance.colors.text)
                 line = state.before_cursor + state.after_cursor
                 if state.history.filter == '':
                     sel_start, sel_end = state.get_selection_range()
-                    stdout.write(line[:sel_start] +
+                    sys.stdout.write(line[:sel_start] +
                                  appearance.colors.selection +
                                  line[sel_start: sel_end] +
                                  color.Fore.DEFAULT + color.Back.DEFAULT + appearance.colors.text +
@@ -192,12 +188,12 @@ def main():
                         colored_line += appearance.colors.search_filter + line[start : end]
                         pos = end
                     colored_line += color.Fore.DEFAULT + color.Back.DEFAULT + appearance.colors.text + line[pos:]
-                    stdout.write(colored_line)
+                    sys.stdout.write(colored_line)
 
                 # Erase remaining chars from old line
                 to_erase = prev_total_len - len(remove_escape_sequences(state.prompt) + state.before_cursor + state.after_cursor)
                 if to_erase > 0:
-                    stdout.write(color.Fore.DEFAULT + color.Back.DEFAULT + ' ' * to_erase)
+                    sys.stdout.write(color.Fore.DEFAULT + color.Back.DEFAULT + ' ' * to_erase)
                     cursor_backward(to_erase)
 
                 # Move cursor to the correct position
@@ -304,7 +300,7 @@ def main():
                                      dir_hist.max_len)
                         if dir_hist.shown:
                             dir_hist.display()
-                            stdout.write(state.prev_prompt)
+                            sys.stdout.write(state.prev_prompt)
                     else:
                         if rec.VirtualKeyCode == 37:            # Alt-Left
                             state.handle(ActionCode.ACTION_LEFT_WORD, select)
@@ -322,7 +318,7 @@ def main():
                     if state.before_cursor + state.after_cursor == '':
                         dir_hist.display()
                         dir_hist.check_overflow(remove_escape_sequences(state.prev_prompt))
-                        stdout.write(state.prev_prompt)
+                        sys.stdout.write(state.prev_prompt)
                     else:
                         state.handle(ActionCode.ACTION_DELETE_WORD)
                 elif rec.VirtualKeyCode == 87:          # Alt-W
@@ -374,7 +370,7 @@ def main():
                                      1000)
                         auto_select = False
                 elif recChar == '\t':                  # Tab
-                    stdout.write(state.after_cursor)        # Move cursor to the end
+                    sys.stdout.write(state.after_cursor)        # Move cursor to the end
 
                     tokens = parse_line(state.before_cursor)
                     if tokens == [] or state.before_cursor[-1] in sep_chars:
@@ -408,18 +404,18 @@ def main():
                             (c_x, c_y) = get_cursor()
                             offset_from_bottom = console.get_buffer_size()[1] - c_y
                             message = ' Scroll ' + str(int(round(num_screens))) + ' screens? [Tab] '
-                            stdout.write('\n' + message)
+                            sys.stdout.write('\n' + message)
                             rec = read_input()
                             move_cursor(c_x, console.get_buffer_size()[1] - offset_from_bottom)
-                            stdout.write('\n' + ' ' * len(message))
+                            sys.stdout.write('\n' + ' ' * len(message))
                             move_cursor(c_x, console.get_buffer_size()[1] - offset_from_bottom)
                             if recChar != '\t':
                                 continue
 
-                        stdout.write('\n')
+                        sys.stdout.write('\n')
                         for line in range(0, num_lines):
                             # Print one line
-                            stdout.write('\r')
+                            sys.stdout.write('\r')
                             for column in range(0, num_columns):
                                 if line + column * num_lines < len(suggestions):
                                     s = suggestions[line + column * num_lines]
@@ -431,23 +427,23 @@ def main():
                                         match = wildcard_to_regex(prefix + '*').match(s)
                                         current_index = 0
                                         for i in range(1, match.lastindex + 1):
-                                            stdout.write(color.Fore.DEFAULT + color.Back.DEFAULT +
+                                            sys.stdout.write(color.Fore.DEFAULT + color.Back.DEFAULT +
                                                          appearance.colors.completion_match +
                                                          s[current_index : match.start(i)] +
                                                          color.Fore.DEFAULT + color.Back.DEFAULT +
                                                          s[match.start(i) : match.end(i)])
                                             current_index = match.end(i)
-                                        stdout.write(color.Fore.DEFAULT + color.Back.DEFAULT + ' ' * (column_width - len(s)))
+                                        sys.stdout.write(color.Fore.DEFAULT + color.Back.DEFAULT + ' ' * (column_width - len(s)))
                                     else:
                                         # Print the common part in a different color
                                         common_prefix_len = len(find_common_prefix(state.before_cursor, suggestions))
-                                        stdout.write(color.Fore.DEFAULT + color.Back.DEFAULT +
+                                        sys.stdout.write(color.Fore.DEFAULT + color.Back.DEFAULT +
                                                      appearance.colors.completion_match +
                                                      s[:common_prefix_len] +
                                                      color.Fore.DEFAULT + color.Back.DEFAULT +
                                                      s[common_prefix_len : ])
-                                        stdout.write(color.Fore.DEFAULT + color.Back.DEFAULT + ' ' * (column_width - len(s)))
-                            stdout.write('\n')
+                                        sys.stdout.write(color.Fore.DEFAULT + color.Back.DEFAULT + ' ' * (column_width - len(s)))
+                            sys.stdout.write('\n')
                         state.reset_prev_line()
                     state.handle(ActionCode.ACTION_COMPLETE, completed)
                 elif rec.Char == chr(8):                # Backspace
@@ -457,8 +453,8 @@ def main():
 
 
         # Done reading line, now execute
-        stdout.write(state.after_cursor)        # Move cursor to the end
-        stdout.write(color.Fore.DEFAULT + color.Back.DEFAULT)
+        sys.stdout.write(state.after_cursor)        # Move cursor to the end
+        sys.stdout.write(color.Fore.DEFAULT + color.Back.DEFAULT)
         line = (state.before_cursor + state.after_cursor).strip()
         tokens = parse_line(line)
         if tokens == [] or tokens[0] == '':
@@ -493,7 +489,7 @@ def internal_cd(args):
             target = expand_env_vars(target.strip(u'"').strip(u' '))
             os.chdir(target.encode(sys.getfilesystemencoding()))
     except OSError, error:
-        stdout.write(u'\n' + str(error).replace('\\\\', '\\').decode(sys.getfilesystemencoding()))
+        sys.stdout.write('\n' + str(error).replace('\\\\', '\\').decode(sys.getfilesystemencoding()))
     os.environ['CD'] = os.getcwd()
 
 
@@ -639,7 +635,7 @@ def run_in_cmd(tokens):
                 del os.environ[variable]
         for variable in new_environ:
             os.environ[variable] = new_environ[variable]
-    cd = os.environ['CD'].decode(stdout.encoding)
+    cd = os.environ['CD'].decode(sys.stdout.encoding)
     os.chdir(cd.encode(sys.getfilesystemencoding()))
 
 

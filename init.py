@@ -213,4 +213,4 @@ behavior.completion_mode = 'bash'
 #	   color.Fore.DEFAULT +
 #	   '! ***')
 # Run an empty command to initialize environment
-run_in_cmd(['C:\\ShellEnv\\j-tree\\usr\\local\\lib\\cmd-motd.bat'])
+# run_in_cmd(['C:\\ShellEnv\\j-tree\\usr\\local\\lib\\cmd-motd.bat'])

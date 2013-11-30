@@ -264,4 +264,4 @@ class ColorOutputStream:
         """Dispatch printing to our enhanced write function"""
         write_str(str)
 
-sys.stdout = ColorOutputStream()
+
