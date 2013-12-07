@@ -239,7 +239,9 @@ class Enum(object):
 		if titem in [long, int]:
 			keys = self.__vals__.keys()
 			item = int(item)
+			#noinspection PyTypeChecker
 			if item < 0 or item > len(keys): raise KeyError()
+			#noinspection PyUnresolvedReferences
 			key = keys[item]
 		else:
 			key = item
@@ -265,6 +267,7 @@ class Enum(object):
 
 		fmtval = lambda k: k + ' = ' + val2str(getattr(self, k))
 		keys = self.keys()
+		#noinspection PyUnresolvedReferences
 		keys.sort()
 		return '\n'.join([fmtval(k) for k in keys])
 
@@ -543,16 +546,17 @@ has no effect on memory objects allocated with GMEM_FIXED. """
 #####################
 
 def ReadOneConsoleInput(handle):
-	buf = ONE_INPUT_RECORD()
+	#noinspection PyCallingNonCallable
+	buf = INPUT_RECORD()
 	dw = DWORD(0)
-	if ReadConsoleInput(handle, cast(buf, PINPUT_RECORD), 1, byref(dw)) and dw.value == 1:
-		return buf[0]
+	if ReadConsoleInput(handle, byref(buf), 1, byref(dw)) and dw.value == 1:
+		return buf
 	else:
-		raise WindowsError('Could not read one input event.')
+		raise WinError()
 
 def WriteOneConsoleInput(handle, record):
 	dw = DWORD(0)
-	assert(WriteConsoleInput(handle, cast(record, PINPUT_RECORD), 1, byref(dw)) == 1)
+	return WriteConsoleInput(handle, pointer(record), 1, byref(dw)) > 0
 
 class Clipboard(object):
 
@@ -562,13 +566,13 @@ class Clipboard(object):
 	#noinspection PyUnusedLocal
 	def __enter__(self):
 		if not OpenClipboard(self._hwnd_):
-			raise WindowsError('Could not open the windows clipboard.')
+			raise WinError(descr='Could not open the windows clipboard.')
 		return self
 
 	#noinspection PyUnusedLocal
 	def __exit__(self, typ, value, traceback):
 		if not CloseClipboard():
-			raise WindowsError('Could not close the windows clipboard.')
+			raise WinError(descr='Could not close the windows clipboard.')
 
 	@property
 	def text(self): return self.__get_text__()
@@ -594,14 +598,14 @@ class Clipboard(object):
 		bufsize = sizeof(textbuf)
 		hMem = GlobalAlloc(GHND, bufsize)
 		if not bool(hMem):
-			raise WindowsError('Could not allocate our buffer.')
+			raise WinError(descr='Could not allocate our buffer.')
 		hMemPtr = GlobalLock(hMem)
 		if not bool(hMemPtr):
-			raise WindowsError('Could not lock our buffer.')
+			raise WinError(descr='Could not lock our buffer.')
 		memmove(hMemPtr, textbuf, bufsize)
 		GlobalUnlock(hMemPtr)
 		if not EmptyClipboard() or not SetClipboardData(CF_TEXT, hMemPtr):
-			raise WindowsError('Could not set the clipboard text.')
+			raise WinError(descr='Could not set the clipboard text.')
 
 	def __str__(self): return self.text
 
