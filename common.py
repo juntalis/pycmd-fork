@@ -289,7 +289,7 @@ def _is_exec_extension(fext):
     return fext in exec_exts()
 def has_exec_extension(filename):
     """Check whether the specified file is executable, i.e. its extension is .exe, .com or .bat"""
-    fileext = filename.lower().splitext()[0]
+    fileext = os.path.splitext(filename.lower())[1]
     return _is_exec_extension(fileext)
 
 
