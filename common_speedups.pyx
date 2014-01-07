@@ -352,7 +352,7 @@ def _is_exec_extension(fext):
 
 def has_exec_extension(filename):
     """ Check whether the specified file is executable, i.e. its extension is in PATHEXT """
-    fileext = filename.lower().splitext()[0]
+    fileext = os.path.splitext(filename.lower())[1]
     return _is_exec_extension(fileext)
 
 
