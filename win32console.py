@@ -179,17 +179,8 @@ def PyINPUT_RECORDType(EventType):
     """
     return INPUT_RECORD(EventType)
 
-GetStdHandle = kernel32.GetStdHandle
-GetStdHandle.restype = HANDLE
-GetStdHandle.argtypes = [ DWORD ]
-GetStdHandle._flags_ |= FUNCFLAG_USE_LASTERROR
-GetStdHandle.errcheck = errcheck_handle_result
-
-GetConsoleWindow = kernel32.GetConsoleWindow
-GetConsoleWindow.restype = HWND
-GetConsoleWindow.argtypes = [ ]
-GetConsoleWindow._flags_ |= FUNCFLAG_USE_LASTERROR
-GetConsoleWindow.errcheck = errcheck_handle_result
+GetConsoleWindow = HANDLEFUNC('GetConsoleWindow', [ ])
+GetStdHandle     = HANDLEFUNC('GetStdHandle', [ DWORD ])
 
 GetConsoleScreenBufferInfo  = BOOLFUNC('GetConsoleScreenBufferInfo', [ HANDLE, PCONSOLE_SCREEN_BUFFER_INFO ])
 
@@ -201,7 +192,6 @@ SetConsoleWindowInfo        = BOOLFUNC('SetConsoleWindowInfo', [ HANDLE, BOOL, P
 SetConsoleTextAttribute     = BOOLFUNC('SetConsoleTextAttribute', [ HANDLE, WORD ])
 ReadConsoleOutputAttribute  = BOOLFUNC('ReadConsoleOutputAttribute', [ HANDLE, LPWORD, DWORD, COORD, LPDWORD ])
 WriteConsoleOutputAttribute = BOOLFUNC('WriteConsoleOutputAttribute', [ HANDLE, LPWORD, DWORD, COORD, LPDWORD ])
-
 
 SetConsoleTitle             = BOOLFUNC('SetConsoleTitle', [ LPTSTR ], use_tchar=True)
 FlushConsoleInputBuffer     = BOOLFUNC('FlushConsoleInputBuffer', [ HANDLE ], use_last_error=False) # Suppress errcheck

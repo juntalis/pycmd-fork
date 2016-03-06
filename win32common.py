@@ -35,19 +35,10 @@ FALSE = 0
 PNULL = c_void_p(NULL)
 INVALID_HANDLE_VALUE = ULONG_PTR(-1).value
 
-## File Access Flags
-GENERIC_READ = 0x80000000L
-GENERIC_WRITE = 0x40000000
+#######################
+# Structures & Unions #
+#######################
 
-## FlashWindowEx Flags
-FLASHW_STOP      = 0x00000000
-FLASHW_CAPTION   = 0x00000001
-FLASHW_TRAY      = 0x00000002
-FLASHW_ALL       = 0x00000003
-FLASHW_TIMER     = 0x00000004
-FLASHW_TIMERNOFG = 0x0000000C
-
-# Structs
 ## Try to import _COORD from ctypes.wintypes or declare our own.
 try:
     from ctypes.wintypes import _COORD as COORD
@@ -65,14 +56,6 @@ class SizedStructure32(Structure):
         args = list(args)
         args.insert(0, sizeof(self))
         super(SizedStructure32, self).__init__(*args, **kwargs)
-
-class FLASHWINFO(SizedStructure32):
-    _fields_ = [('hwnd', HWND),
-                ('flags', DWORD),
-                ('count', UINT),
-                ('timeout', DWORD)]
-
-PFLASHWINFO = POINTER(FLASHWINFO)
 
 ####################
 # Shared Utilities #
@@ -174,11 +157,16 @@ def _build_function_decl(name, argtypes, kwargs, restype=None, errcheck=None, no
     return funcptr
 
 def BOOLFUNC(name, argtypes, **kwargs):
-    """ Template for BOOL resulting functions that set last error and return false on failure """
+    """ Template for BOOL returning functions that set last error and return false on failure """
     return _build_function_decl(name, argtypes, kwargs, BOOL, errcheck_bool_result_checked, errcheck_bool_result)
 
+def HANDLEFUNC(name, argtypes, **kwargs):
+    """ Template for HANDLE returning function. Checks returns for INVALID_HANDLE_VALUE and NULL, and
+        uses the value of GetLastError for determining error codes. """
+    return _build_function_decl(name, argtypes, kwargs, HANDLE, errcheck_handle_result)
+
 def PTRFUNC(name, argtypes, **kwargs):
-    """ Template for pointer resulting functions that set last error and return NULL on failure """
+    """ Template for pointer returning functions that set last error and return NULL on failure """
     return _build_function_decl(name, argtypes, kwargs, LPVOID, errcheck_nonzero_success)
 
 #########################
@@ -197,37 +185,9 @@ _ExpandEnvironmentStrings.restype = DWORD
 _ExpandEnvironmentStrings.argtypes = [ LPCTSTR, LPTSTR, DWORD ]
 _ExpandEnvironmentStrings._flags_ |= FUNCFLAG_USE_LASTERROR
 
-_FlashWindowEx = BOOLFUNC('FlashWindowEx', [ PFLASHWINFO ], dll=user32)
-
-GetForegroundWindow = user32.GetForegroundWindow
-GetForegroundWindow.restype = HWND
-GetForegroundWindow.argtypes = [ ]
-GetForegroundWindow.__doc__ = \
-    """ Retrieves a handle to the foreground window (the window with which the user is currently working). The system
-    assigns a slightly higher priority to the thread that creates the foreground window than it does to other threads. """
-
 #####################
 # Function Wrappers #
 #####################
-
-def FlashWindow(hwnd, count=0, timeout=0, **kwargs):
-    if not hwnd: return False
-
-    # Resolve the flags.
-    flags = 0
-    if kwargs.pop('caption', False):
-        flags |= FLASHW_CAPTION
-    if kwargs.pop('taskbar', True):
-        flags |= FLASHW_TRAY
-    if kwargs.pop('foreground', False):
-        flags |= FLASHW_TIMERNOFG
-    if kwargs.pop('start', False):
-        flags |= FLASHW_TIMER
-    if kwargs.pop('stop', False):
-        flags = FLASHW_STOP
-
-    flashwin = FLASHWINFO(hwnd, flags, count, timeout)
-    return bool(_FlashWindowEx(byref(flashwin)))
 
 def ExpandEnvironmentStrings(text):
     """ Opens the clipboard for reading/writing
