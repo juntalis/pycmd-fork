@@ -41,6 +41,10 @@ _GlobalUnlock = kernel32.GlobalUnlock
 _GlobalUnlock.restype = BOOL
 _GlobalUnlock.argtypes = [ HGLOBAL ]
 
+#####################
+# Function Wrappers #
+#####################
+
 def OpenClipboard(hWnd=None):
     """
     The OpenClipboard function opens the clipboard for examination and prevents other applications from modifying th
