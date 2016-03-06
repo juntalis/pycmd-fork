@@ -3,13 +3,15 @@
 #
 import ctypes, sys, locale, time
 from ctypes import Structure, Union, c_int, c_long, c_char, c_wchar, c_short, pointer, byref
-from ctypes.wintypes import BOOL, WORD, DWORD
-from win32console import GetStdHandle, STD_INPUT_HANDLE, PyINPUT_RECORDType, KEY_EVENT
+from ctypes.wintypes import BOOL, WORD, DWORD, SMALL_RECT
+from win32console import COORD, CONSOLE_CURSOR_INFO, CONSOLE_SCREEN_BUFFER_INFO
+from win32console import GetStdHandle, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, PyINPUT_RECORDType, KEY_EVENT
+from win32console import SetConsoleTextAttribute, WriteConsoleOutputAttribute, ReadConsoleOutputAttribute
+from win32console import WriteOneConsoleInput, ReadOneConsoleInput, GetConsoleScreenBufferInfo, SetConsoleTitle
+from win32console import SetConsoleCursorPosition, SetConsoleCursorInfo, SetConsoleWindowInfo, FlushConsoleInputBuffer
 from win32con import LEFT_CTRL_PRESSED, RIGHT_CTRL_PRESSED
 from win32con import LEFT_ALT_PRESSED, RIGHT_ALT_PRESSED
 from win32con import SHIFT_PRESSED
-
-import pywintypes       # Unneeded import to trick cx_freeze into including the DLL
 
 global FOREGROUND_RED
 global FOREGROUND_GREEN
@@ -20,63 +22,35 @@ global FOREGROUND_BRIGHT
 global BACKGROUND_RED
 global BACKGROUND_GREEN
 global BACKGROUND_BLUE
+global BACKGROUND_WHITE
 global BACKGROUND_BRIGHT
 
 global stdout_handle
 global stdin_handle
 
-class COORD(Structure):
-    _fields_ = [('X', c_short),
-                ('Y', c_short)]
-
-class SMALL_RECT(Structure):
-    _fields_ = [('Left', c_short),
-                ('Top', c_short),
-                ('Right', c_short),
-                ('Bottom', c_short)]
-
-class CONSOLE_CURSOR_INFO(Structure):
-    _fields_ = [('size', c_int),
-                ('visible', c_int)]
-
-class CONSOLE_SCREEN_BUFFER_INFO(Structure):
-    _fields_ = [('size', COORD),
-                ('cursorPosition', COORD),
-                ('attributes', WORD),
-                ('window', SMALL_RECT),
-                ('maxWindowSize', COORD)]
-
-class KEY_EVENT_RECORD(Structure):
-    _fields_ = [('keyDown', BOOL),
-                ('repeatCount', WORD),
-                ('virtualKeyCode', WORD),
-                ('virtualScanCode', WORD),
-                ('char', c_char),
-                ('controlKeyState', DWORD)]
-    
 def get_text_attributes():
     """Get the current foreground/background RGB components"""
     buffer_info = CONSOLE_SCREEN_BUFFER_INFO()
-    ctypes.windll.kernel32.GetConsoleScreenBufferInfo(stdout_handle, pointer(buffer_info))
+    GetConsoleScreenBufferInfo(stdout_handle, byref(buffer_info))
     return buffer_info.attributes
 
 def set_text_attributes(color):
     """Set foreground/background RGB components for the text to write"""
-    ctypes.windll.kernel32.SetConsoleTextAttribute(stdout_handle, color)
+    SetConsoleTextAttribute(stdout_handle, color)
 
 def get_buffer_attributes(x, y, n):
     """Get the fg/bg/attributes for the n chars in the buffer starting at (x, y)"""
     colors = (n * WORD)()
     coord = COORD(x, y)
     read = DWORD(0)
-    ctypes.windll.kernel32.ReadConsoleOutputAttribute(stdout_handle, colors, n, coord, pointer(read))
+    ReadConsoleOutputAttribute(stdout_handle, colors, n, coord, byref(read))
     return colors
 
 def set_buffer_attributes(x, y, colors):
     """Set the fg/bg attributes for the n chars in the the buffer starting at (x, y)"""
     coord = COORD(x, y)
     written = DWORD(0)
-    ctypes.windll.kernel32.WriteConsoleOutputAttribute(stdout_handle, colors, len(colors), coord, pointer(written))
+    WriteConsoleOutputAttribute(stdout_handle, colors, len(colors), coord, byref(written))
 
 def visual_bell():
     """Flash the screen for brief moment to notify the user"""
@@ -90,17 +64,17 @@ def visual_bell():
 
 def set_console_title(title):
     """Set the title of the current console"""
-    ctypes.windll.kernel32.SetConsoleTitleA(title)
+    SetConsoleTitle(title)
 
 def move_cursor(x, y):
     """Move the cursor to the specified location"""
     location = COORD(x, y)
-    ctypes.windll.kernel32.SetConsoleCursorPosition(stdout_handle, location)
+    SetConsoleCursorPosition(stdout_handle, location)
 
 def get_cursor():
     """Get the current cursor position"""
     buffer_info = CONSOLE_SCREEN_BUFFER_INFO()
-    ctypes.windll.kernel32.GetConsoleScreenBufferInfo(stdout_handle, pointer(buffer_info))
+    GetConsoleScreenBufferInfo(stdout_handle, byref(buffer_info))
     return (buffer_info.cursorPosition.X, buffer_info.cursorPosition.Y)
 
 def get_buffer_size():
@@ -109,7 +83,7 @@ def get_buffer_size():
     # On Win64, GetConsoleScreenBufferInfo randomly fails with code 6 (invalid handle?!)
     # Calling this invisible stdout.write seems to avoid the problem
     sys.stdout.write('')
-    ctypes.windll.kernel32.GetConsoleScreenBufferInfo(stdout_handle, pointer(buffer_info))
+    GetConsoleScreenBufferInfo(stdout_handle, byref(buffer_info))
     return (buffer_info.size.X, buffer_info.size.Y)
 
 def get_viewport():
@@ -118,13 +92,13 @@ def get_viewport():
     # On Win64, GetConsoleScreenBufferInfo randomly fails with code 6 (invalid handle?!)
     # Calling this invisible stdout.write seems to avoid the problem
     sys.stdout.write('')
-    ctypes.windll.kernel32.GetConsoleScreenBufferInfo(stdout_handle, pointer(buffer_info))
+    GetConsoleScreenBufferInfo(stdout_handle, byref(buffer_info))
     return (buffer_info.window.Left, buffer_info.window.Top, buffer_info.window.Right, buffer_info.window.Bottom)
 
 def set_cursor_attributes(size, visibility):
     """Set the cursor size and visibility"""
     cursor_info = CONSOLE_CURSOR_INFO(size, visibility)
-    ctypes.windll.kernel32.SetConsoleCursorInfo(stdout_handle, pointer(cursor_info))
+    SetConsoleCursorInfo(stdout_handle, byref(cursor_info))
 
 def cursor_backward(count):
     """Move cursor backward with the given number of positions"""
@@ -150,12 +124,12 @@ def scroll_buffer(lines):
         
     if (lines < 0 and t >= lines or lines > 0 and b + lines <= h):
         info = SMALL_RECT(l, t + lines, r, b + lines)
-        ctypes.windll.kernel32.SetConsoleWindowInfo(stdout_handle, True, byref(info))
+        SetConsoleWindowInfo(stdout_handle, True, byref(info))
 
 def read_input():
     """Read one input event from the console input buffer"""
     while True:
-        record = stdin_handle.ReadConsoleInput(1)[0]
+        record = ReadOneConsoleInput(stdin_handle)
         if record.EventType == KEY_EVENT and record.KeyDown:
             return record
 
@@ -165,7 +139,7 @@ def write_input(key_code, control_state):
     record.KeyDown = True
     record.VirtualKeyCode = key_code
     record.ControlKeyState = control_state
-    stdin_handle.WriteConsoleInput([record])
+    WriteOneConsoleInput(stdin_handle, record)
 
 def write_str(s):
     """
@@ -308,7 +282,7 @@ BACKGROUND_BRIGHT = 0x80
 BACKGROUND_WHITE = BACKGROUND_BLUE | BACKGROUND_GREEN | BACKGROUND_RED
 
 stdin_handle = GetStdHandle(STD_INPUT_HANDLE)
-stdout_handle = ctypes.windll.kernel32.GetStdHandle(-11)
+stdout_handle = GetStdHandle(STD_OUTPUT_HANDLE)
 
 class ColorOutputStream:
     """
@@ -316,14 +290,37 @@ class ColorOutputStream:
      * our color sequences
      * string encoding
 
-     Note that this requires sys.stdout be only imported _after_ console;
-     not doing so will bring the original stdout in the current scope!
-     """
+    Note that this requires sys.stdout be only imported _after_ console;
+    not doing so will bring the original stdout in the current scope!
+
+    Additional Note: mode, name, softspace, writelines, and flush are not
+    used anywhere in PyCmd's source code, but since they're expected on
+    the stdout handle, it wouldn't be unexpected for them to be referenced
+    in external user code or a debugger. (so I implemented them)
+    """
+    mode = 'w'
+    name = sys.__stdout__.name
     encoding = sys.__stdout__.encoding
+    softspace = sys.__stdout__.softspace
     
     def write(self, str):
         """Dispatch printing to our enhanced write function"""
         write_str(str)
+
+    def writelines(self, values):
+        """
+         Write the strings to the file.
+
+         Note that newlines are not added.  The sequence can be any iterable object
+         producing strings. This is equivalent to calling write() for each string.
+        """
+        for value in values:
+            self.write(value)
+
+    def flush(self):
+        """ Flush the internal I/O buffer. """
+        FlushConsoleInputBuffer(stdout_handle)
+
 
 # Set default encoding to the system's locale; this needs to be done here,
 # before we install the custom output stream (since we reload(sys))
