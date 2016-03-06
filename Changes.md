@@ -21,13 +21,16 @@ Cataloging the changes I've made to the original PyCmd source code:
               > pointer does a lot more work since it constructs a real pointer
               > object, so it is faster to use byref if you don't need the
               > pointer object in Python itself
- * Changes made to [InputState.py]:
+ * Removed pywin32 dependencies from  [InputState.py] and [PyCmd.py].
     * No actual changes to the original PyCmd source code were necessary for
-      this one. From PyCmd's perspective, the new ctypes implementations in
-      [win32clipboard.py] are functionally equivalent to the pywin32 versions.
+      this one. The ctypes implementations in [win32clipboard.py],
+      [win32gui.py], and [win32console.py] use more or less the same logic as
+      the pywin32 implementations.
 
+[PyCmd.py]: PyCmd.py
 [console.py]: console.py
 [InputState.py]: InputState.py
+[win32gui.py]: win32gui.py
 [win32console.py]: win32console.py
 [win32clipboard.py]: win32clipboard.py
 
