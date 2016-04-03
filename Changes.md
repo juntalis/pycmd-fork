@@ -1,4 +1,4 @@
-Cataloging the changes I've made to the original PyCmd source code:
+Cataloging the changes I've made to the original PyCmd source code & behavior:
 
  * Changes made to [console.py]:
     * Expanded the `ColorOutputStream` class, adding a few members that you'd
