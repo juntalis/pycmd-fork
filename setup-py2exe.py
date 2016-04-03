@@ -42,7 +42,7 @@ info.update({
     'console': [ {
         'script': 'bootstrap.py',
         'dest_base': 'PyCmd',
-        'icon_resources': [ (1, 'PyCmd.ico') ]
+        'icon_resources': [ (0, 'PyCmd.ico') ]
     } ],
     'data_files': [('', loose_files)],
     'options': {
@@ -73,7 +73,7 @@ info.update({
 # by just inserting the command line ourselves.
 has_py2exe = False
 argvcopy = copy.copy(sys.argv)
-for idx,arg in argvcopy:
+for idx,arg in enumerate(argvcopy):
     if arg == 'build':
         sys.argv[idx] = 'py2exe'
         has_py2exe = True
