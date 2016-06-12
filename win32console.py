@@ -7,7 +7,6 @@ that referenced members of win32console's wrapper types, I didn't think it was
 worth the time it'd take to write a set of matching Python classes.
 """
 from win32common import *
-from win32tchar import _TFUNC
 
 #############
 # Constants #
@@ -72,7 +71,7 @@ class KEY_EVENT_RECORD(Structure):
 
     https://msdn.microsoft.com/en-us/library/windows/desktop/ms684166%28v=vs.85%29.aspx
     """
-    _CharT = _TFUNC('Char')
+    _CharT = 'Char' + TCHAR_SUFFIX
     _fields_ = [ ('KeyDown', BOOL),
                  ('RepeatCount', WORD),
                  ('VirtualKeyCode', WORD),
@@ -86,7 +85,7 @@ class KEY_EVENT_RECORD(Structure):
 
     @CharA.setter
     def CharA(self, value):
-        self.uChar.CharU = value
+        self.CharU.CharA = value
 
     @property
     def CharW(self):
@@ -194,7 +193,7 @@ ReadConsoleOutputAttribute  = BOOLFUNC('ReadConsoleOutputAttribute', [ HANDLE, L
 WriteConsoleOutputAttribute = BOOLFUNC('WriteConsoleOutputAttribute', [ HANDLE, LPWORD, DWORD, COORD, LPDWORD ])
 
 SetConsoleTitle             = BOOLFUNC('SetConsoleTitle', [ LPTSTR ], use_tchar=True)
-FlushConsoleInputBuffer     = BOOLFUNC('FlushConsoleInputBuffer', [ HANDLE ], use_last_error=False) # Suppress errcheck
+FlushConsoleInputBuffer     = BOOLFUNC('FlushConsoleInputBuffer', [ HANDLE ], checked=False, use_last_error=False)
 ReadConsoleInput            = BOOLFUNC('ReadConsoleInput', [ HANDLE, PINPUT_RECORD, DWORD, LPDWORD ], use_tchar=True)
 WriteConsoleInput           = BOOLFUNC('WriteConsoleInput', [ HANDLE, PINPUT_RECORD, DWORD, LPDWORD ], use_tchar=True)
 
