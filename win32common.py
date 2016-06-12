@@ -65,7 +65,7 @@ _TPAIR = lambda name, dll: (_TFUNC(name), dll,)
 
 ## Try to import _COORD from ctypes.wintypes or declare our own.
 try:
-    from wintypes import _COORD as COORD
+    from ctypes.wintypes import _COORD as COORD
 except ImportError:
     class COORD(Structure):
         _fields_ = [ ('X', c_short),
