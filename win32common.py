@@ -1,10 +1,8 @@
+import os as _os, ctypes
 from ctypes import *
 from ctypes.wintypes import *
 from functools import wraps as _wraps
 from _ctypes import FUNCFLAG_USE_LASTERROR
-
-# Shadow ctypes stuff
-from win32tchar import *
 
 ###########
 # Globals #
@@ -34,6 +32,32 @@ TRUE = 1
 FALSE = 0
 PNULL = c_void_p(NULL)
 INVALID_HANDLE_VALUE = ULONG_PTR(-1).value
+
+###############
+# TCHAR Stuff #
+###############
+
+# TODO: This is just a placeholder. Having trouble finding any concrete info on unicode filepath support across Windows versions.
+TCHAR_UNICODE = _os.path.supports_unicode_filenames
+
+# Set the appropriate handlers
+if TCHAR_UNICODE:
+    _T = unicode
+    TCHAR_SUFFIX = 'W'
+    tstring_at = wstring_at
+    TCHAR = c_tchar = c_wchar
+    LPCTSTR = LPTSTR = c_tchar_p = c_wchar_p
+    create_tstring_buffer = create_unicode_buffer
+else:
+    _T = str
+    TCHAR_SUFFIX = 'A'
+    tstring_at = string_at
+    TCHAR = c_tchar = c_char
+    LPCTSTR = LPTSTR = c_tchar_p = c_char_p
+    create_tstring_buffer = create_string_buffer
+
+_TFUNC = lambda name: name + TCHAR_SUFFIX
+_TPAIR = lambda name, dll: (_TFUNC(name), dll,)
 
 #######################
 # Structures & Unions #
@@ -100,14 +124,16 @@ def memoize(func):
 # Common Handlers for errcheck #
 ################################
 
-_uses_last_error = lambda func: (func._flags_ & FUNCFLAG_USE_LASTERROR) == FUNCFLAG_USE_LASTERROR
+_uses_last_error = lambda func: bool(func._flags_ & FUNCFLAG_USE_LASTERROR)
 
 def _errcheck_failure(result, func, args):
     if _uses_last_error(func):
-        return ctypes.WinError(ctypes.get_last_error())
+        return WinError(get_last_error())
     else:
-        return ctypes.WinError(
-            descr='Failed call made to {0} (Result: {1}) with args: {2}'.format(func.__name__, result, repr(args))
+        return WinError(
+            descr='Failed call made to {0} (Result: {1}) with args: {2}'.format(
+                func.__name__, result, repr(args)
+            )
         )
 
 def errcheck_nonzero_failure(result, func, args):
@@ -138,36 +164,52 @@ def errcheck_bool_result_checked(result, func, args):
 # Ctypes Utility Wrappers #
 ###########################
 
-def _build_function_decl(name, argtypes, kwargs, restype=None, errcheck=None, noerrcheck=None):
-    """ Shared utility for building function declarations based on common patterns. """
-    doc = kwargs.pop('doc', None)
-    procpair = (name, kwargs.pop('dll', kernel32))
-    kwargs.setdefault('use_last_error', True)
-    funcptr = WINFUNCTYPE(restype, *argtypes, **kwargs)(procpair)
-    if doc is not None:
-        funcptr.__doc__ = doc
+def WINFUNCDECL(name, argtypes, restype=None, **kwargs):
+    """ Utility function to create fully-typed ctypes function prototypes
+        in one call. """
+    # Need to remove our custom keyword arguments before calling the prototype
+    # factory.
+    funcdoc = kwargs.pop('doc', None)
+    errcheck = kwargs.pop('errcheck', None)
+    paramflags = kwargs.pop('paramflags', None)
+    func_spec = (name, kwargs.pop('dll', kernel32))
+    FUNCTYPE = kwargs.pop('proto', WINFUNCTYPE)
+    use_last_error = kwargs.setdefault('use_last_error', True)
 
-    if kwargs['use_last_error']:
-        if errcheck is not None:
-            funcptr.errcheck = errcheck
-    else:
-        if noerrcheck is not None:
-            funcptr.errcheck = noerrcheck
+    # Handle TCHAR naming if necessary
+    if kwargs.pop('use_tchar', False):
+        func_spec = _TPAIR(*func_spec)
+
+    # Construct our prototype and apply it to the (name_or_ordinal, dll) pair
+    funcptr = FUNCTYPE(restype, *argtypes, **kwargs)(func_spec, paramflags)
+
+    # Apply any specified properties.
+    if funcdoc is not None:
+        funcptr.__doc__ = funcdoc
+    if errcheck is not None:
+        funcptr.errcheck = errcheck
 
     return funcptr
 
-def BOOLFUNC(name, argtypes, **kwargs):
-    """ Template for BOOL returning functions that set last error and return false on failure """
-    return _build_function_decl(name, argtypes, kwargs, BOOL, errcheck_bool_result_checked, errcheck_bool_result)
+def BOOLFUNC(name, argtypes, checked=True, **kwargs):
+    """ Template for BOOL returning functions that set last error and return
+        false on failure. """
+    kwargs.setdefault('errcheck', errcheck_bool_result_checked if checked \
+                                  else errcheck_bool_result)
+    return WINFUNCDECL(name, argtypes, restype=BOOL, **kwargs)
 
 def HANDLEFUNC(name, argtypes, **kwargs):
-    """ Template for HANDLE returning function. Checks returns for INVALID_HANDLE_VALUE and NULL, and
-        uses the value of GetLastError for determining error codes. """
-    return _build_function_decl(name, argtypes, kwargs, HANDLE, errcheck_handle_result)
+    """ Template for HANDLE returning function. Checks returns for
+        INVALID_HANDLE_VALUE and NULL, and uses the value of GetLastError for
+        determining error codes. """
+    kwargs.setdefault('errcheck', errcheck_handle_result)
+    return WINFUNCDECL(name, argtypes, restype=HANDLE, **kwargs)
 
 def PTRFUNC(name, argtypes, **kwargs):
-    """ Template for pointer returning functions that set last error and return NULL on failure """
-    return _build_function_decl(name, argtypes, kwargs, LPVOID, errcheck_nonzero_success)
+    """ Template for pointer returning functions that set last error and return
+        NULL on failure """
+    kwargs.setdefault('errcheck', errcheck_nonzero_success)
+    return WINFUNCDECL(name, argtypes, restype=LPVOID, **kwargs)
 
 #########################
 # C Function Prototypes #
@@ -180,10 +222,10 @@ def PTRFUNC(name, argtypes, **kwargs):
 # GetFileAttributesW.restype = DWORD
 # GetFileAttributesW.argtypes = [ LPCWSTR ]
 
-_ExpandEnvironmentStrings = kernel32.ExpandEnvironmentStringsT
-_ExpandEnvironmentStrings.restype = DWORD
-_ExpandEnvironmentStrings.argtypes = [ LPCTSTR, LPTSTR, DWORD ]
-_ExpandEnvironmentStrings._flags_ |= FUNCFLAG_USE_LASTERROR
+_ExpandEnvironmentStrings = WINFUNCDECL(
+    'ExpandEnvironmentStrings', [ LPCTSTR, LPTSTR, DWORD ],
+    restype=DWORD, use_tchar=True, use_last_error=True
+)
 
 #####################
 # Function Wrappers #
