@@ -52,7 +52,7 @@ def OpenClipboard(hWnd=None):
 
     :param hWnd: Window handle
     :type hWnd: HWND|int
-    :return: If the function fails, the standard ctypes.WinError is raised.
+    :return: If the function fails, the standard WinError is raised.
     :rtype: bool
     """
     if hWnd is None: hWnd = PNULL
@@ -65,38 +65,38 @@ def GetClipboardData(cformat=CF_TEXT):
 
     :param cformat: Specified clipboard format. (Default=CF_TEXT)
     :type cformat: int
-    :return: If the function fails, the standard ctypes.WinError is raised.
+    :return: If the function fails, the standard WinError is raised.
     :rtype: str
     """
     result = None
     cstr_at = lambda ptr, size: NotImplemented
     if cformat == CF_TEXT or cformat == CF_OEMTEXT:
-        cstr_at = lambda ptr, size: ctypes.string_at(ptr, size - 1)
+        cstr_at = lambda ptr, size: string_at(ptr, size - 1)
     elif cformat == CF_UNICODETEXT:
-        cstr_at = lambda ptr, size: ctypes.wstring_at(ptr, (size / sizeof(WCHAR)) - 1)
+        cstr_at = lambda ptr, size: wstring_at(ptr, (size / sizeof(WCHAR)) - 1)
     else:
         raise NotImplementedError('GetClipboardData is only implemented for CF_TEXT at the moment.')
 
     chandle = _GetClipboardData(cformat)
     if not bool(chandle):
-        raise ctypes.WinError()
+        raise WinError()
 
     try:
         cdataptr = _GlobalLock(chandle)
         if not bool(cdataptr):
-            # Wasn't sure if the _GlobalUnlock call would be made before or after ctypes.WinError
+            # Wasn't sure if the _GlobalUnlock call would be made before or after WinError
             # grabbed the last Win32 error code, so I decided to go this route and grab it before
             # the error is thrown.
-            last_error = ctypes.get_last_error()
-            raise ctypes.WinError(last_error)
+            last_error = get_last_error()
+            raise WinError(last_error)
 
         csize = _GlobalSize(cdataptr)
         if csize <= 0:
-            last_error = ctypes.get_last_error()
+            last_error = get_last_error()
             if last_error == ERROR_SUCCESS:
-                raise ctypes.WinError(descr='Specified clipboard format is not available.')
+                raise WinError(descr='Specified clipboard format is not available.')
             else:
-                raise ctypes.WinError(last_error)
+                raise WinError(last_error)
 
         result = cstr_at(cdataptr, csize)
     finally:
@@ -115,18 +115,18 @@ def SetClipboardText(text, cformat=CF_TEXT):
     """
     create_cobj = None
     if cformat == CF_TEXT or cformat == CF_OEMTEXT:
-        create_cobj = ctypes.create_string_buffer
+        create_cobj = create_string_buffer
     elif cformat == CF_UNICODETEXT:
-        create_cobj = ctypes.create_unicode_buffer
+        create_cobj = create_unicode_buffer
 
     # The string creation functions automatically add the extra termination character.
     ctextobj = create_cobj(text)
 
     # Allocate our buffer
-    csize = ctypes.sizeof(ctextobj)
+    csize = sizeof(ctextobj)
     chandle = _GlobalAlloc(GHND, csize)
     if not bool(chandle):
-        raise ctypes.WinError()
+        raise WinError()
 
     # Setup some state-tracking flags so that we can cleanup properly if any errors occur.
     #   0 => No cleanup required.
@@ -138,18 +138,18 @@ def SetClipboardText(text, cformat=CF_TEXT):
         cdataptr = _GlobalLock(chandle)
         cleanup_stage = 2
         if not bool(cdataptr):
-            last_error = ctypes.get_last_error()
-            raise ctypes.WinError(last_error)
+            last_error = get_last_error()
+            raise WinError(last_error)
 
         # Copy the text buffer to our memory handle, then unlock it.
-        ctypes.memmove(cdataptr, ctextobj, csize)
+        memmove(cdataptr, ctextobj, csize)
         _GlobalUnlock(chandle)
         cleanup_stage = 1
 
         # And finally, transfer ownership of the memory to the clipboard.
         if not _SetClipboardData(cformat, chandle):
-            last_error = ctypes.get_last_error()
-            raise ctypes.WinError(last_error)
+            last_error = get_last_error()
+            raise WinError(last_error)
 
         cleanup_stage = 0
     finally:
