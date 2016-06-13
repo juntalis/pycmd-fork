@@ -3,7 +3,6 @@
 import os as _os
 from ctypes import *
 from ctypes.wintypes import *
-from functools import wraps as _wraps
 from _ctypes import FUNCFLAG_USE_LASTERROR
 
 ###########
@@ -82,45 +81,6 @@ class SizedStructure32(Structure):
         args = list(args)
         args.insert(0, sizeof(self))
         super(SizedStructure32, self).__init__(*args, **kwargs)
-
-####################
-# Shared Utilities #
-####################
-
-def once(func):
-    """
-    Fires once, then returns the same result for every call after that.
-
-    :param function func: The decorated function
-    :rtype: function
-    """
-    func._lazycall = (False, None,)
-
-    # noinspection PyProtectedMember
-    @_wraps(func)
-    def lazy_deco(*args, **kwargs):
-        if not func._lazycall[0]:
-            func._lazycall = (True, func(*args, **kwargs),)
-        return func._lazycall[1]
-    return lazy_deco
-
-
-def memoize(func):
-    """
-    From the Python Decorator Library (http://wiki.python.org/moin/PythonDecoratorLibrary):
-    Cache the results of a function call with specific arguments. Note that this decorator ignores **kwargs.
-
-    :param function func: The decorated function
-    :rtype: function
-    """
-    cache = func._cache = dict()
-
-    @_wraps(func)
-    def memoizer(*args, **kwargs):
-        if args not in cache:
-            cache[args] = func(*args, **kwargs)
-        return cache[args]
-    return memoizer
 
 ################################
 # Common Handlers for errcheck #
