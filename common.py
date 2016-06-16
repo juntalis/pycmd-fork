@@ -4,6 +4,7 @@
 import os, string, fsm, _winreg, pefile, mmap, sys, traceback
 import re
 import pycmd_public
+from codeutil import patchable
 
 
 # Stop points when navigating one word at a time
@@ -341,6 +342,7 @@ def is_gui_application(executable):
     # Return False when not sure
     return result
 
+@patchable
 def apply_settings(settings_file):
     """
     Execute a configuration file (if it exists), overriding values from the

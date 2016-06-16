@@ -1,0 +1,2 @@
+# Optional dependencies
+-e git+https://github.com/ajakubek/python-llist.git#egg=llist  

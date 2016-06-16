@@ -1,5 +1,6 @@
 import sys, os, time, traceback
 from console import read_input
+from hijacks import apply_hijacks
 
 def we_are_frozen():
     """Returns whether we are frozen via py2exe.
@@ -25,6 +26,7 @@ def bootstrap():
     import PyCmd
     PyCmd.__dict__['__name__'] = '__main__'
     PyCmd.__dict__['__file__'] = os.path.join(scriptdir, 'PyCmd.py')
+    apply_hijacks(PyCmd)
     return PyCmd
 
 if __name__=='__main__':

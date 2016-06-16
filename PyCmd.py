@@ -1,6 +1,7 @@
 import sys, os, tempfile, signal, time, traceback, codecs
 import win32console, win32gui, win32con
 
+from codeutil import patchable, hijack
 from common import parse_line, unescape, sep_tokens, sep_chars, exec_extensions, pseudo_vars
 from common import expand_tilde, expand_env_vars
 from common import associated_application, full_executable_path, is_gui_application
@@ -23,6 +24,7 @@ state = None
 dir_hist = None
 tmpfile = None
 
+@patchable
 def init():
     # %APPDATA% is not always defined (e.g. when using runas.exe)
     if 'APPDATA' in os.environ.keys():
@@ -64,6 +66,7 @@ def init():
     # Catch SIGINT to emulate Ctrl-C key combo
     signal.signal(signal.SIGINT, signal_handler)
 
+@patchable
 def deinit():
     os.remove(tmpfile)
 
@@ -121,6 +124,7 @@ def main():
             internal_exit()
         arg += 1
 
+    hijack('motd', color, appearance, behavior)
     if not behavior.quiet_mode:
         # Print some splash text
         try:
@@ -592,6 +596,7 @@ def run_command(tokens):
             # If the window is inactive, flash after long tasks
             win32gui.FlashWindowEx(console_window, win32con.FLASHW_ALL, 3, 750)
 
+@patchable
 def run_in_cmd(tokens):
     line_sanitized = ''
     for token in tokens:
