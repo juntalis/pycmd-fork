@@ -185,6 +185,10 @@ behavior.quiet_mode = False
 #
 behavior.completion_mode = 'bash'
 
+appearance.motd = color.Fore.CYAN + u"""
+>>> Hello World!
+"""
+
 
 # Remember, you can do whatever you want in this Python script!
 #
