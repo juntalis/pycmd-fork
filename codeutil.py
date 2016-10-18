@@ -10,9 +10,7 @@ except ImportError:
     dllist, sllist = list, list
     remove_index = lambda lst, index: lst.pop(index)
 
-_events = dict()
-_patches = dict()
-_hijacks = dict()
+_events, _patches, _hijacks = dict(), dict(), dict()
 
 def _logger():
     """
@@ -203,12 +201,12 @@ def patchable(func):
     key = utility.membername(func)
 
     @_wraps(func)
-    def wrapped(*args, **kwargs):
+    def patchable_deco(*args, **kwargs):
         global _patches
         handler = _patches.get(key, func)
         return handler(*args, **kwargs)
 
-    return wrapped
+    return patchable_deco
 
 def unpatch(key):
     """
