@@ -23,7 +23,7 @@ def bootstrap():
     # Import the PyCmd script and alter its
     # internal dict to fool it into thinking
     # it was run as the main script.
-    PyCmd = importlib.import_module('PyCmd')
+    import PyCmd
     PyCmd.__dict__['__name__'] = '__main__'
     PyCmd.__dict__['__file__'] = os.path.join(scriptdir, 'PyCmd.py')
     apply_hijacks(PyCmd)
