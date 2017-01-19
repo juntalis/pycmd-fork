@@ -38,7 +38,7 @@ info = {
 # See http://www.py2exe.org/index.cgi/ListOfOptions for
 # information on the following options.
 info.update({
-    'zipfile': None,
+    'zipfile': 'PyCmd.zip',
     'console': [ {
         'script': 'bootstrap.py',
         'dest_base': 'PyCmd',
@@ -51,7 +51,7 @@ info.update({
             'optimize': 2,
             'unbuffered': 1,
             'compressed': 1,
-            'bundle_files': 1,
+            'bundle_files': 3,
             # 'skip_archive': 0,
             # 'custom_boot_script': '',
             'excludes': map(noext, loose_files),
