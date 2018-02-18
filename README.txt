@@ -30,15 +30,18 @@ persistent history, etc.)
     - dynamic, context-sensitive token expansion with Alt-/ (Emacs-style)
     - search string ([Shift-]F3)
     - smart word-by-word navigation
-    - lexical selection (Shift-Up)
+    - lexical selection (Shift-Up/Down)
 
  d. Navigation
     - history of recently visited directories (Alt-Left/Right/D on empty line)
     - cd to parent (Alt-Up)
 
  e. Other
-    - show a highlighted prompt to make the buffer content more readable
-    - smart prompt that abbreviates directory names to save screen space
+    - smart prompt:
+      - highlighted for readability
+      - abbreviates path to save space
+      - displays git and svn status
+      - customizable
     - configuration file (init.py) for customizing colors, prompt etc.
     - Shift-PgUp/PgDn to scroll the buffer
     - expand ~ as %HOME% or %USERPROFILE%

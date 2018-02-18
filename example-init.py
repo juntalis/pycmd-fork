@@ -120,39 +120,6 @@ appearance.colors.completion_match = color.Fore.TOGGLE_RED
 appearance.colors.dir_history_selection = (color.Fore.TOGGLE_BRIGHT +
                                            color.Back.TOGGLE_BRIGHT)
 
-
-# Custom prompt function, see below for comments on appearance.prompt
-def git_prompt():
-    """
-    Custom prompt that displays the name of the current git branch in addition
-    to the typical "abbreviated current path" PyCmd prompt.
-
-    Requires git & grep to be present in the PATH.
-    """
-    # Many common modules (sys, os, subprocess, time, re, ...) are readily
-    # shipped with PyCmd, you can directly import them for use in your
-    # configuration script. If you need extra modules that are not bundled,
-    # manipulate the sys.path so that they can be found (just make sure that the
-    # version is compatible with the one used to build PyCmd -- check
-    # README.txt)
-    import subprocess
-
-    stdout = subprocess.Popen(
-        'git branch | grep "^*"', 
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=-1).communicate()[0]
-    branch_name = stdout.strip(' \n\r*')
-    path = abbrev_path()
-
-    # The current color setting is defined by appearance.colors.prompt
-    prompt = ''
-    if branch_name != '':
-        prompt += color.Fore.TOGGLE_BLUE + '[' + branch_name + ']' + color.Fore.TOGGLE_BLUE + ' '
-    prompt += path + '> '
-
-    return prompt
-
 # Define a custom prompt function.
 #
 # This is called by PyCmd whenever a prompt is to be displayed. It should return
@@ -161,11 +128,20 @@ def git_prompt():
 # Before the returned string is printed, the text color is set to
 # appearance.colors.prompt; but you can always alter it or add more complex
 # coloring by embedding color specifications in the returned string (like we do
-# in our example git_prompt).
+# in our example git_prompt.)
 #
-# The default is the typical "abbreviated path" prompt:
-#       appearance.prompt = pycmd_public.abbrev_path_prompt
-appearance.prompt = git_prompt
+# The default is a "universal" prompt that atomatically selects between the
+# following predefined prompts:
+#   * appearance.simple_prompt (by default returns the abbreviated path)
+#   * appearance.git_prompt (returns condensed git status info + simple_prompt)
+#   * appearance.svn_prompt (returns svn dirty indicator + simple_prompt)
+#
+# You can customize this at different levels (have a look at pycmd_public.py for
+# inspiration):
+#  1. Replace appearance.simple_prompt, .git_prompt, .svn_prompt with custom
+#     functions
+#  2. Replace the "top-level" appearance.prompt with a custom function
+appearance.prompt = universal_prompt
 
 
 # Make PyCmd be "quiet", i.e. skip its welcome and goodbye messages
@@ -184,10 +160,6 @@ behavior.quiet_mode = False
 # the typical bash-like completion.
 #
 behavior.completion_mode = 'bash'
-
-appearance.motd = color.Fore.CYAN + u"""
->>> Hello World!
-"""
 
 
 # Remember, you can do whatever you want in this Python script!

@@ -38,6 +38,7 @@ class ActionCode:
     ACTION_SEARCH_RIGHT = 25
     ACTION_SEARCH_LEFT = 26
     ACTION_SELECT_UP = 27
+    ACTION_SELECT_DOWN = 28
 
 
 class InputState:
@@ -85,6 +86,9 @@ class InputState:
         self.undo_emacs_index = -1
         self.last_action = ActionCode.ACTION_none
 
+        # Selection history for extend/shrink selection (before_cursor, after_cursor, selection_start, extend_separators) tuple
+        self.selection_history = []
+
         # Search string
         self.search_substr = None
         self.search_rev = False
@@ -104,6 +108,7 @@ class InputState:
             ActionCode.ACTION_SEARCH_RIGHT: self.key_search_right,
             ActionCode.ACTION_SEARCH_LEFT: self.key_search_left,
             ActionCode.ACTION_SELECT_UP: self.key_extend_selection,
+            ActionCode.ACTION_SELECT_DOWN: self.key_shrink_selection,
             ActionCode.ACTION_COPY: self.key_copy,
             ActionCode.ACTION_CUT: self.key_cut,
             ActionCode.ACTION_PASTE: self.key_paste,
@@ -326,6 +331,15 @@ class InputState:
 
         self.extend_selection()
 
+    def key_shrink_selection(self):
+        if self.selection_history:
+            self.before_cursor, self.after_cursor, self.selection_start, self.extend_separators = self.selection_history.pop()
+            if not self.selection_history:
+                self.reset_selection()
+        else:
+            self.bell = True
+
+
     def key_left_word(self, select=False):
         """Move backward one word (Ctrl-Left)"""
         # Skip spaces
@@ -498,11 +512,12 @@ class InputState:
                 self.advance_search()
         else:
             # Typing mode
+            if self.get_selection() != '':
+                self.delete_selection()
             self.before_cursor += text
             if self.overwrite:
                 self.after_cursor = self.after_cursor[len(text):]
             self.reset_selection()
-            self.delete_selection()
 
     def key_complete(self, completed):
         """Update the text before cursor to match some completion"""
@@ -608,6 +623,7 @@ class InputState:
         self.selection_start = len(self.before_cursor)
         self.search_substr = None
         self.extend_separators = None
+        self.selection_history = []
 
     def delete_selection(self):
         """Remove currently selected text"""
@@ -658,24 +674,26 @@ class InputState:
         line = self.before_cursor + self.after_cursor
         extend_begin = len(self.before_cursor)
         extend_end = max(self.selection_start, extend_begin)
+        separators = list(self.extend_separators)
         expanded = False
 
-        while not expanded and self.extend_separators != []:
-            while extend_begin >= 1 and not line[extend_begin - 1] in self.extend_separators:
+        while not expanded and separators != []:
+            while extend_begin >= 1 and not line[extend_begin - 1] in separators:
                 extend_begin -= 1
                 expanded = True
-            while extend_end < len(line) and not line[extend_end] in self.extend_separators:
+            while extend_end < len(line) and not line[extend_end] in separators:
                 extend_end += 1
                 expanded = True
-            self.extend_separators.pop(0)
+            separators.pop(0)
 
-            if self.extend_separators == [] and self.before_cursor.count('"') % 2 == 1:
-                self.extend_separators = list(EXTEND_SEPARATORS_OUTSIDE_QUOTES)
+            if separators == [] and self.before_cursor.count('"') % 2 == 1:
+                separators = list(EXTEND_SEPARATORS_OUTSIDE_QUOTES)
 
         if expanded:
+            self.selection_history.append((self.before_cursor, self.after_cursor, self.selection_start, self.extend_separators))
             self.before_cursor = line[:extend_begin]
             self.after_cursor = line[extend_begin:]
             self.selection_start = extend_end
+            self.extend_separators = separators
         else:
             self.bell = True
-

@@ -23,6 +23,7 @@ pycmd_install_dir = None
 state = None
 dir_hist = None
 tmpfile = None
+save_history_limit = 2000
 
 @patchable
 def init():
@@ -243,7 +244,7 @@ def main():
                         state.handle(ActionCode.ACTION_ESCAPE)
                         update_history(state.history.list[-1],
                                      pycmd_data_dir + '\\history',
-                                     1000)
+                                       save_history_limit)
                         auto_select = False
                 elif rec.VirtualKeyCode == 65:          # Ctrl-A
                     state.handle(ActionCode.ACTION_HOME, select)
@@ -360,6 +361,8 @@ def main():
                 state.handle(ActionCode.ACTION_SEARCH_LEFT)
             elif is_shift_pressed(rec) and rec.VirtualKeyCode == 38:    # Shift-Up
                 state.handle(ActionCode.ACTION_SELECT_UP)
+            elif is_shift_pressed(rec) and rec.VirtualKeyCode == 40:    # Shift-Down
+                state.handle(ActionCode.ACTION_SELECT_DOWN)
             else:                                       # Clean key (no modifiers)
                 if rec.Char == chr(0):                  # Special key (arrows and such)
                     if rec.VirtualKeyCode == 37:        # Left arrow
@@ -396,7 +399,7 @@ def main():
                         state.handle(ActionCode.ACTION_ESCAPE)
                         update_history(state.history.list[-1],
                                      pycmd_data_dir + '\\history',
-                                     1000)
+                                       save_history_limit)
                         auto_select = False
                 elif rec.Char == '\t':                  # Tab
                     tokens = parse_line(state.before_cursor)
@@ -455,7 +458,7 @@ def main():
                             tokens = parse_line(completed.rstrip(path_sep))
                             token = tokens[-1].replace('"', '')
                             (_, _, prefix) = token.rpartition(path_sep)
-                            match = wildcard_to_regex(prefix + '*').match(s)
+                            pattern = wildcard_to_regex(prefix + '*')
                         else:
                             # Length of the common prefix will be printed in a different color
                             common_prefix_len = len(find_common_prefix(state.before_cursor, suggestions))
@@ -469,6 +472,7 @@ def main():
                                     s = suggestions[line + column * num_lines]
                                     if has_wildcards(tokens[-1]):
                                         # Print wildcard matches in a different color
+                                        match = pattern.match(s)
                                         current_index = 0
                                         for i in range(1, match.lastindex + 1):
                                             stdout.write(color.Fore.DEFAULT + color.Back.DEFAULT +
@@ -503,13 +507,15 @@ def main():
             continue
         else:
             print
+            if not is_pure_cd(tokens):
+                dir_hist.keep = True
             run_command(tokens)
 
         # Add to history
         state.history.add(line)
         update_history(state.history.list[-1],
                      pycmd_data_dir + '\\history',
-                     1000)
+                       save_history_limit)
 
 
         # Add to dir history
@@ -556,7 +562,7 @@ def run_command(tokens):
 
     if tokens[0] == 'exit':
         internal_exit('Bye!')
-    elif tokens[0].lower() == 'cd' and [t for t in tokens if t in sep_tokens] == []:
+    elif is_pure_cd(tokens):
         # This is a single CD command -- use our custom, more handy CD
         internal_cd([unescape(t) for t in tokens[1:]])
     else:
@@ -598,8 +604,12 @@ def run_command(tokens):
         run_in_cmd(tokens)
         console_window = win32console.GetConsoleWindow()
         if win32gui.GetForegroundWindow() != console_window and time.time() - start_time > 15:
-            # If the window is inactive, flash after long tasks
+            # If the window is inactive, flash after long t1asks
             win32gui.FlashWindowEx(console_window, win32con.FLASHW_ALL, 3, 750)
+
+
+def is_pure_cd(tokens):
+    return tokens[0].lower() == 'cd' and [t for t in tokens if t in sep_tokens] == []
 
 @patchable
 def run_in_cmd(tokens):
@@ -725,6 +735,10 @@ def print_usage():
     print 'Note that you can use \'/\' instead of \'-\', uppercase instead of '
     print 'lowercase and \'/?\' instead of \'-h\''
 
+    
+# cx_freeze sometimes messes this (no idea why...)
+if __name__ == 'pycmd__main__':
+    __name__ = '__main__'
 
 # Entry point
 if __name__ == '__main__':
