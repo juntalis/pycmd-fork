@@ -5,8 +5,10 @@ Alternative setup script using py2exe instead of cx_Freeze.
 """
 from distutils.core import setup
 # noinspection PyPackageRequirements
-import py2exe, sys, os, copy
+import py2exe, sys, os, copy, platform
 
+arch = platform.architecture()[0]
+is_x64 = arch.startswith('64')
 loose_files = ['example-init.py', 'pycmd_public.py']
 noext = lambda filepath: os.path.splitext(filepath)[0]
 
@@ -38,7 +40,7 @@ info = {
 # See http://www.py2exe.org/index.cgi/ListOfOptions for
 # information on the following options.
 info.update({
-    'zipfile': 'PyCmd.zip',
+    'zipfile': 'PyCmd.zip' if is_x64 else None,
     'console': [ {
         'script': 'bootstrap.py',
         'dest_base': 'PyCmd',
@@ -47,11 +49,11 @@ info.update({
     'data_files': [('', loose_files)],
     'options': {
         'py2exe': {
-            'xref': 1,
+            #'xref': 1,
             'optimize': 2,
             'unbuffered': 1,
             'compressed': 1,
-            'bundle_files': 3,
+            'bundle_files': 1,
             # 'skip_archive': 0,
             # 'custom_boot_script': '',
             'excludes': map(noext, loose_files),

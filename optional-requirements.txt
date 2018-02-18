@@ -1,2 +1,2 @@
-# Optional dependencies
--e git+https://github.com/ajakubek/python-llist.git#egg=llist  
+llist
+-e svn+https://svn.code.sf.net/p/py2exe/svn/trunk/py2exe#egg=py2exe

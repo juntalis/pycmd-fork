@@ -23,7 +23,8 @@ PFLASHWINFO = POINTER(FLASHWINFO)
 #########################
 
 _FlashWindowEx = BOOLFUNC('FlashWindowEx', [ PFLASHWINFO ], dll=user32)
-GetForegroundWindow = HANDLEFUNC('GetForegroundWindow', [ ], dll=user32)
+GetForegroundWindow = HANDLEFUNC('GetForegroundWindow', [ ], dll=user32,
+                                 errcheck=None)
 
 #####################
 # Function Wrappers #

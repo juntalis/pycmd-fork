@@ -183,7 +183,7 @@ GetStdHandle     = HANDLEFUNC('GetStdHandle', [ DWORD ])
 
 GetConsoleScreenBufferInfo  = BOOLFUNC('GetConsoleScreenBufferInfo', [ HANDLE, PCONSOLE_SCREEN_BUFFER_INFO ])
 
-SetConsoleCursorPosition    = BOOLFUNC('SetConsoleCursorPosition', [ HANDLE, COORD ])
+_SetConsoleCursorPosition    = BOOLFUNC('SetConsoleCursorPosition', [ HANDLE, COORD ])
 SetConsoleCursorInfo        = BOOLFUNC('SetConsoleCursorInfo', [ HANDLE, PCONSOLE_CURSOR_INFO ])
 
 SetConsoleWindowInfo        = BOOLFUNC('SetConsoleWindowInfo', [ HANDLE, BOOL, PSMALL_RECT ])
@@ -196,6 +196,20 @@ SetConsoleTitle             = BOOLFUNC('SetConsoleTitle', [ LPTSTR ], use_tchar=
 FlushConsoleInputBuffer     = BOOLFUNC('FlushConsoleInputBuffer', [ HANDLE ], checked=False, use_last_error=False)
 ReadConsoleInput            = BOOLFUNC('ReadConsoleInput', [ HANDLE, PINPUT_RECORD, DWORD, LPDWORD ], use_tchar=True)
 WriteConsoleInput           = BOOLFUNC('WriteConsoleInput', [ HANDLE, PINPUT_RECORD, DWORD, LPDWORD ], use_tchar=True)
+
+def SetConsoleCursorPosition(handle, location):
+    try:
+        result = _SetConsoleCursorPosition(handle, location)
+    except WindowsError as err:
+        if err.winerror == 87:
+            message = '{} (handle={}, location=COORD({}, {}))'.format(
+                err.strerror,
+                handle, location.X, location.Y
+            )
+            raise WinError(err.winerror, message)
+        else:
+            raise
+    return result
 
 def ReadOneConsoleInput(handle):
     # noinspection PyCallingNonCallable
